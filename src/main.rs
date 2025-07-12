@@ -1,16 +1,14 @@
 mod ssh_config;
 use color_eyre::Result;
-use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyEventKind};
 use futures::{FutureExt, StreamExt};
-use ratatui::{
-    DefaultTerminal, Frame,
-    style::Stylize,
-    text::Line,
-    widgets::{Block, Paragraph},
-};
-use ssh_config::{SharedSshHosts, load_ssh_configs};
+use ratatui::widgets::TableState;
+use ratatui::{DefaultTerminal, Frame, widgets::ScrollbarState};
+use ssh_config::{SharedSshHosts, SshHostInfo, load_ssh_configs};
+mod tui;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tui::list_ssh::{handle_key as handle_list_key, render as render_list};
 
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {
@@ -21,20 +19,51 @@ async fn main() -> color_eyre::Result<()> {
     result
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, PartialEq)]
+pub enum AppMode {
+    List,
+    Search,
+}
+
+#[derive(Debug)]
 pub struct App {
     running: bool,
     event_stream: EventStream,
+    pub mode: AppMode,
     pub ssh_hosts: SharedSshHosts,
+    pub table_state: TableState,
+    pub table_height: usize,
+    pub selected_id: Option<String>,
+    pub vertical_scroll_state: ScrollbarState,
+    pub vertical_scroll: usize,
+    pub search_query: String,
+    pub visible_hosts: Vec<(String, SshHostInfo)>,
 }
 
 impl App {
     pub fn new() -> Self {
         let ssh_hosts = load_ssh_configs().unwrap_or_default(); // now a HashMap
+        let mut visible_hosts: Vec<(String, SshHostInfo)> = ssh_hosts
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        visible_hosts.sort_by_key(|(_, h)| h.name.clone());
+        let selected_id = visible_hosts.first().map(|(id, _)| id.clone());
         Self {
             running: false,
             event_stream: EventStream::new(),
+            mode: AppMode::List,
             ssh_hosts: Arc::new(Mutex::new(ssh_hosts)),
+            // Table
+            table_height: 0,
+            table_state: TableState::default().with_selected(Some(0)),
+            selected_id,
+            // Vertical Scrolling
+            vertical_scroll: 0,
+            vertical_scroll_state: ScrollbarState::new(0),
+            // Search
+            search_query: String::new(),
+            visible_hosts,
         }
     }
 
@@ -54,19 +83,9 @@ impl App {
     /// - <https://docs.rs/ratatui/latest/ratatui/widgets/index.html>
     /// - <https://github.com/ratatui/ratatui/tree/master/examples>
     fn draw(&mut self, frame: &mut Frame) {
-        let title = Line::from("Ratatui Simple Template")
-            .bold()
-            .blue()
-            .centered();
-        let text = "Hello, Ratatui!\n\n\
-            Created using https://github.com/ratatui/templates\n\
-            Press `Esc`, `Ctrl-C` or `q` to stop running.";
-        frame.render_widget(
-            Paragraph::new(text)
-                .block(Block::bordered().title(title))
-                .centered(),
-            frame.area(),
-        )
+        match self.mode {
+            AppMode::List | AppMode::Search => render_list(self, frame),
+        }
     }
 
     /// Reads the crossterm events and updates the state of [`App`].
@@ -94,18 +113,52 @@ impl App {
         Ok(())
     }
 
-    /// Handles the key events and updates the state of [`App`].
     fn on_key_event(&mut self, key: KeyEvent) {
-        match (key.modifiers, key.code) {
-            (_, KeyCode::Esc | KeyCode::Char('q'))
-            | (KeyModifiers::CONTROL, KeyCode::Char('c') | KeyCode::Char('C')) => self.quit(),
-            // Add other key handlers here.
-            _ => {}
+        match self.mode {
+            AppMode::List => match key.code {
+                KeyCode::Char('/') => {
+                    self.mode = AppMode::Search;
+                    self.search_query.clear();
+                }
+                KeyCode::Char('j') | KeyCode::Down => {
+                    self.vertical_scroll = self.vertical_scroll.saturating_add(1);
+                    handle_list_key(self, key);
+                    self.update_selected_id_from_table();
+                }
+                KeyCode::Char('k') | KeyCode::Up => {
+                    self.vertical_scroll = self.vertical_scroll.saturating_sub(1);
+                    handle_list_key(self, key);
+                    self.update_selected_id_from_table();
+                }
+                _ => handle_list_key(self, key),
+            },
+            AppMode::Search => match key.code {
+                KeyCode::Esc => {
+                    self.mode = AppMode::List;
+                    self.search_query.clear();
+                    self.vertical_scroll = 0;
+                }
+                KeyCode::Enter => {
+                    self.mode = AppMode::List;
+                }
+                KeyCode::Backspace => {
+                    self.search_query.pop();
+                }
+                KeyCode::Char(c) => {
+                    self.search_query.push(c);
+                }
+
+                _ => {}
+            },
         }
     }
 
-    /// Set running to false to quit the application.
-    fn quit(&mut self) {
-        self.running = false;
+    pub fn update_selected_id_from_table(&mut self) {
+        if let Some(index) = self.table_state.selected() {
+            if index < self.visible_hosts.len() {
+                let (id, _) = &self.visible_hosts[index];
+                self.selected_id = Some(id.clone());
+            }
+        }
     }
 }
