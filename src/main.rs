@@ -1,11 +1,13 @@
+mod backend;
+use backend::db::init_db_connection;
 mod ssh_config;
 use color_eyre::Result;
 use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyEventKind};
 use futures::{FutureExt, StreamExt};
 use ratatui::widgets::TableState;
 use ratatui::{DefaultTerminal, Frame, widgets::ScrollbarState};
+use rusqlite::Connection;
 use ssh_config::{SharedSshHosts, SshHostInfo, load_ssh_configs};
-mod backend;
 mod tui;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -32,6 +34,7 @@ pub struct App {
     running: bool,
     event_stream: EventStream,
     pub mode: AppMode,
+    pub db: Arc<Mutex<Connection>>,
     pub ssh_hosts: SharedSshHosts,
     pub table_state: TableState,
     pub table_height: usize,
@@ -55,6 +58,7 @@ impl App {
             running: false,
             event_stream: EventStream::new(),
             mode: AppMode::List,
+            db: Arc::new(Mutex::new(init_db_connection())),
             ssh_hosts: Arc::new(Mutex::new(ssh_hosts)),
             // Table
             table_height: 0,

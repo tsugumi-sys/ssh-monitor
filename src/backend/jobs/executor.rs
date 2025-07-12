@@ -3,19 +3,34 @@ use crate::backend::jobs::job::{JobGroup, JobKind, JobResult};
 use crate::backend::ssh::{connect_ssh_session, run_ssh_command};
 use anyhow::{Result, anyhow};
 use log::{error, info, warn};
+use rusqlite::Connection;
 use std::{collections::HashMap, sync::Arc};
-use tokio::{sync::RwLock, task, time};
+use tokio::{
+    sync::{Mutex, RwLock},
+    task, time,
+};
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct JobGroupExecutor {
     groups: Arc<RwLock<HashMap<String, JobGroup>>>,
+    db: Arc<Mutex<Connection>>,
 }
 
 impl JobGroupExecutor {
+    pub fn new(db: Arc<Mutex<Connection>>) -> Self {
+        Self {
+            groups: Arc::new(RwLock::new(HashMap::new())),
+            db,
+        }
+    }
+
     pub async fn run_all(&self) {
         let groups = self.groups.read().await;
         for group in groups.values().cloned() {
-            task::spawn(run_group_task(group));
+            let db = self.db.clone();
+            task::spawn(async move {
+                run_group_task(group, db).await;
+            });
         }
     }
 
@@ -34,12 +49,12 @@ impl JobGroupExecutor {
     }
 }
 
-async fn run_group_task(group: JobGroup) {
+async fn run_group_task(group: JobGroup, conn: Arc<Mutex<Connection>>) {
     loop {
         match run_group_once(group.clone()).await {
             Ok(results) => {
                 for result in results {
-                    if let Err(e) = store_job_result(&group.host.name, &result).await {
+                    if let Err(e) = store_job_result(&conn, &group.host.name, &result).await {
                         error!("❌ Failed to save result to DB: {e}");
                     }
                 }
@@ -61,21 +76,14 @@ async fn run_group_once(group: JobGroup) -> Result<Vec<JobResult>> {
     };
     info!("📜 Full command to execute:\n{}", full_cmd);
 
-    let session = match connect_ssh_session(&group.host) {
-        Ok(s) => s,
-        Err(e) => {
-            error!("❌ SSH connect error: {}", e);
-            return Ok(vec![]);
-        }
-    };
+    let session =
+        connect_ssh_session(&group.host).map_err(|e| anyhow!("SSH connect error: {}", e))?;
 
-    let output = match run_ssh_command(&session, &full_cmd) {
-        Ok(o) => o,
-        Err(e) => {
-            error!("❌ SSH exec error: {}", e);
-            return Ok(vec![]);
-        }
-    };
+    let output =
+        run_ssh_command(&session, &full_cmd).map_err(|e| anyhow!("SSH exec error: {}", e))?;
+
+    info!("🖨️ SSH Output:\n{}", output);
+
     Ok(parse_group_results(&group, &output))
 }
 
@@ -128,10 +136,16 @@ fn extract_tagged_output<'a>(output: &'a str, tag: &str) -> Option<&'a str> {
 #[tokio::test]
 async fn test_job_executor() {
     let _ = env_logger::builder().is_test(true).try_init();
+
+    use crate::backend::db::init_db_connection;
     use crate::backend::jobs::executor::JobGroupExecutor;
     use crate::backend::jobs::job::{JobGroup, JobKind};
     use crate::ssh_config::SshHostInfo;
-    use std::time::Duration;
+    use std::{sync::Arc, time::Duration};
+    use tokio::sync::Mutex;
+
+    // DBコネクションの初期化（共有）
+    let db_conn = Arc::new(Mutex::new(init_db_connection()));
 
     let host = SshHostInfo {
         id: "test".to_string(),
@@ -149,10 +163,13 @@ async fn test_job_executor() {
         jobs: vec![JobKind::Cpu, JobKind::Mem, JobKind::Disk],
     };
 
-    let executor = JobGroupExecutor::default();
+    // ExecutorにDBを渡して生成
+    let executor = JobGroupExecutor::new(db_conn.clone());
+
     executor.register_group(group).await;
 
     let results = executor.run("test").await.unwrap();
+
     for r in results {
         println!(
             "✅ {} => {}",
