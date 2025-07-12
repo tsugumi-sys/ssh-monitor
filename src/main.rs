@@ -1,3 +1,4 @@
+mod ssh_config;
 use color_eyre::Result;
 use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use futures::{FutureExt, StreamExt};
@@ -7,6 +8,9 @@ use ratatui::{
     text::Line,
     widgets::{Block, Paragraph},
 };
+use ssh_config::{SharedSshHosts, load_ssh_configs};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {
@@ -19,16 +23,19 @@ async fn main() -> color_eyre::Result<()> {
 
 #[derive(Debug, Default)]
 pub struct App {
-    /// Is the application running?
     running: bool,
-    // Event stream.
     event_stream: EventStream,
+    pub ssh_hosts: SharedSshHosts,
 }
 
 impl App {
-    /// Construct a new instance of [`App`].
     pub fn new() -> Self {
-        Self::default()
+        let ssh_hosts = load_ssh_configs().unwrap_or_default(); // now a HashMap
+        Self {
+            running: false,
+            event_stream: EventStream::new(),
+            ssh_hosts: Arc::new(Mutex::new(ssh_hosts)),
+        }
     }
 
     /// Run the application's main loop.
