@@ -95,12 +95,28 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     let start_index = app.vertical_scroll;
     let end_index = (start_index + visible_rows).min(host_entries.len());
 
+    let conn = futures::executor::block_on(app.db.lock());
     let rows = host_entries[start_index..end_index]
         .iter()
         .enumerate()
-        .map(|(i, (_id, info))| render_table_row(i, info, &colors));
+        .map(|(i, (id, info))| {
+            let cpu = crate::backend::db::latest_cpu(&conn, id).ok().flatten();
+            let mem = crate::backend::db::latest_mem(&conn, id).ok().flatten();
+            let disk_list = crate::backend::db::latest_disks(&conn, id).ok();
+            let disk = disk_list
+                .as_ref()
+                .and_then(|list| list.iter().find(|d| d.mount_point == "/"));
+            render_table_row(i, info, cpu.as_ref(), mem.as_ref(), disk, &colors)
+        });
+    drop(conn);
 
-    let header = Row::new(vec![Cell::from("Name"), Cell::from("User@Host:Port")]).style(
+    let header = Row::new(vec![
+        Cell::from("Name"),
+        Cell::from("User@Host:Port"),
+        Cell::from("CPU%"),
+        Cell::from("Mem%"),
+        Cell::from("Disk%"),
+    ]).style(
         Style::default()
             .fg(colors.header_fg)
             .bg(colors.header_bg)
@@ -112,7 +128,9 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         [
             Constraint::Length(16),
             Constraint::Length(40),
-            Constraint::Length(16),
+            Constraint::Length(8),
+            Constraint::Length(8),
+            Constraint::Length(8),
         ],
     )
     .header(header)

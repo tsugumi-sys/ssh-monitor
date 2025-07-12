@@ -1,7 +1,11 @@
-use crate::backend::db::store_job_result;
+use crate::backend::db::{
+    store_job_result, store_cpu_result, store_mem_result, store_disk_results,
+};
 use crate::backend::jobs::job::{JobGroup, JobKind, JobResult};
+use crate::backend::jobs::{cpu::CpuInfo, mem::MemInfo, disk::DiskInfo};
 use crate::backend::ssh::{connect_ssh_session, run_ssh_command};
 use anyhow::{Result, anyhow};
+use serde_json;
 use log::{error, info, warn};
 use rusqlite::Connection;
 use std::{collections::HashMap, sync::Arc};
@@ -54,8 +58,11 @@ async fn run_group_task(group: JobGroup, conn: Arc<Mutex<Connection>>) {
         match run_group_once(group.clone()).await {
             Ok(results) => {
                 for result in results {
-                    if let Err(e) = store_job_result(&conn, &group.host.name, &result).await {
+                    if let Err(e) = store_job_result(&conn, &group.host.id, &result).await {
                         error!("❌ Failed to save result to DB: {e}");
+                    }
+                    if let Err(e) = store_typed_results(&conn, &group.host.id, &result).await {
+                        error!("❌ Failed to save typed result: {e}");
                     }
                 }
             }
@@ -65,6 +72,30 @@ async fn run_group_task(group: JobGroup, conn: Arc<Mutex<Connection>>) {
         }
         time::sleep(group.interval).await;
     }
+}
+
+async fn store_typed_results(
+    conn: &Arc<Mutex<Connection>>,
+    host_id: &str,
+    result: &JobResult,
+) -> Result<()> {
+    let value = serde_json::to_value(&result.value)?;
+    match result.job_name.as_str() {
+        "cpu" => {
+            let info: CpuInfo = serde_json::from_value(value)?;
+            store_cpu_result(conn, host_id, &info).await?
+        }
+        "mem" => {
+            let info: MemInfo = serde_json::from_value(value)?;
+            store_mem_result(conn, host_id, &info).await?
+        }
+        "disk" => {
+            let info: Vec<DiskInfo> = serde_json::from_value(value)?;
+            store_disk_results(conn, host_id, &info).await?
+        }
+        _ => {}
+    }
+    Ok(())
 }
 
 async fn run_group_once(group: JobGroup) -> Result<Vec<JobResult>> {

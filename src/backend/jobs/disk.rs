@@ -1,8 +1,8 @@
 use super::job::JobResult;
 use anyhow::Result;
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct DiskInfo {
     pub mount_point: String,
     pub total_mb: u64,

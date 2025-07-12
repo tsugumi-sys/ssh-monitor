@@ -1,8 +1,8 @@
 use super::job::JobResult;
 use anyhow::Result;
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CpuInfo {
     pub model_name: String,
     pub core_count: usize,

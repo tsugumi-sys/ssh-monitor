@@ -1,8 +1,8 @@
 use super::job::JobResult;
 use anyhow::{Result, anyhow};
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct MemInfo {
     pub total_mb: u64,
     pub used_mb: u64,
