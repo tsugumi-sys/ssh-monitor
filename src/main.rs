@@ -5,6 +5,7 @@ use futures::{FutureExt, StreamExt};
 use ratatui::widgets::TableState;
 use ratatui::{DefaultTerminal, Frame, widgets::ScrollbarState};
 use ssh_config::{SharedSshHosts, SshHostInfo, load_ssh_configs};
+mod backend;
 mod tui;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -12,6 +13,7 @@ use tui::list_ssh::{handle_key as handle_list_key, render as render_list};
 
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {
+    env_logger::init();
     color_eyre::install()?;
     let terminal = ratatui::init();
     let result = App::new().run(terminal).await;

@@ -1,4 +1,4 @@
-use crate::app::states::SshHostInfo;
+use crate::ssh_config::SshHostInfo;
 use ssh2::Session;
 use std::io::Read;
 use std::net::TcpStream;
@@ -43,7 +43,7 @@ pub fn connect_ssh_session(info: &SshHostInfo) -> Result<Session, String> {
     Err("SSH authentication failed".into())
 }
 
-pub fn run_command(session: &Session, command: &str) -> Result<String, String> {
+pub fn run_ssh_command(session: &Session, command: &str) -> Result<String, String> {
     let mut channel = session
         .channel_session()
         .map_err(|e| format!("Channel error: {}", e))?;
