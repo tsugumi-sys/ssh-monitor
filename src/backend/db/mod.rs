@@ -7,7 +7,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-/// データベースファイルのパスを取得する
 fn get_default_db_path() -> PathBuf {
     let proj_dirs = ProjectDirs::from("com", "tsugumi-sys", "SshMonitor")
         .expect("❌ Failed to determine data directory");
@@ -16,14 +15,12 @@ fn get_default_db_path() -> PathBuf {
     data_dir.join("ssh_monitor.db")
 }
 
-/// SQLite接続とテーブル初期化、古いデータのクリーンアップを行う
 pub fn init_db_connection() -> Connection {
     let db_path = get_default_db_path();
     println!("📂 Using database at: {}", db_path.display());
 
     let conn = Connection::open(&db_path).expect("❌ Failed to open sqlite db");
 
-    // 初期化（なければテーブル作成）
     conn.execute(
         r#"
         CREATE TABLE IF NOT EXISTS job_results (
@@ -38,7 +35,6 @@ pub fn init_db_connection() -> Connection {
     )
     .expect("❌ Failed to create job_results table");
 
-    // 古いデータを1時間ごとに削除
     conn.execute(
         r#"
         DELETE FROM job_results
@@ -51,7 +47,6 @@ pub fn init_db_connection() -> Connection {
     conn
 }
 
-/// SQLiteにジョブ結果を保存する
 pub async fn store_job_result(
     conn: &Arc<Mutex<Connection>>,
     host_id: &str,
