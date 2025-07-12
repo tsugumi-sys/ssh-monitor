@@ -11,7 +11,8 @@ use ssh_config::{SharedSshHosts, SshHostInfo, load_ssh_configs};
 mod tui;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tui::list_ssh::{handle_key as handle_list_key, render as render_list};
+use tui::list_ssh::{handle_key as handle_list_key, render as render_list, states::ListStates};
+use std::time::{Duration, Instant};
 
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {
@@ -43,6 +44,8 @@ pub struct App {
     pub vertical_scroll: usize,
     pub search_query: String,
     pub visible_hosts: Vec<(String, SshHostInfo)>,
+    pub list_states: ListStates,
+    last_refresh: Instant,
 }
 
 impl App {
@@ -70,12 +73,15 @@ impl App {
             // Search
             search_query: String::new(),
             visible_hosts,
+            list_states: ListStates::default(),
+            last_refresh: Instant::now(),
         }
     }
 
     /// Run the application's main loop.
     pub async fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
         self.running = true;
+        self.refresh_states().await?;
         while self.running {
             terminal.draw(|frame| self.draw(frame))?;
             self.handle_crossterm_events().await?;
@@ -115,6 +121,10 @@ impl App {
             _ = tokio::time::sleep(tokio::time::Duration::from_millis(100)) => {
                 // Sleep for a short duration to avoid busy waiting.
             }
+        }
+        if self.last_refresh.elapsed() >= Duration::from_secs(5) {
+            self.refresh_states().await?;
+            self.last_refresh = Instant::now();
         }
         Ok(())
     }
@@ -166,5 +176,16 @@ impl App {
                 self.selected_id = Some(id.clone());
             }
         }
+    }
+
+    async fn refresh_states(&mut self) -> Result<()> {
+        let conn = self.db.lock().await;
+        let hosts_guard = self.ssh_hosts.lock().await;
+        let host_entries: Vec<(String, SshHostInfo)> = hosts_guard
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        self.list_states.refresh(&conn, &host_entries);
+        Ok(())
     }
 }

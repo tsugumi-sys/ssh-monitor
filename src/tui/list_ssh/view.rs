@@ -95,20 +95,16 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     let start_index = app.vertical_scroll;
     let end_index = (start_index + visible_rows).min(host_entries.len());
 
-    let conn = futures::executor::block_on(app.db.lock());
     let rows = host_entries[start_index..end_index]
         .iter()
         .enumerate()
         .map(|(i, (id, info))| {
-            let cpu = crate::backend::db::latest_cpu(&conn, id).ok().flatten();
-            let mem = crate::backend::db::latest_mem(&conn, id).ok().flatten();
-            let disk_list = crate::backend::db::latest_disks(&conn, id).ok();
-            let disk = disk_list
-                .as_ref()
-                .and_then(|list| list.iter().find(|d| d.mount_point == "/"));
-            render_table_row(i, info, cpu.as_ref(), mem.as_ref(), disk, &colors)
+            let metrics = app.list_states.get(id);
+            let cpu = metrics.and_then(|m| m.cpu.as_ref());
+            let mem = metrics.and_then(|m| m.mem.as_ref());
+            let disk = metrics.and_then(|m| m.disk.as_ref());
+            render_table_row(i, info, cpu, mem, disk, &colors)
         });
-    drop(conn);
 
     let header = Row::new(vec![
         Cell::from("Name"),

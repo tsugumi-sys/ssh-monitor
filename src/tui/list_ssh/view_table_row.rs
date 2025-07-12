@@ -1,5 +1,6 @@
 use super::themed_table::TableColors;
-use crate::backend::jobs::{cpu::CpuInfo, disk::DiskInfo, mem::MemInfo};
+use crate::backend::jobs::{cpu::CpuInfo, mem::MemInfo};
+use super::states::DiskOverview;
 use crate::ssh_config::SshHostInfo;
 use ratatui::prelude::*;
 use ratatui::widgets::*;
@@ -10,7 +11,7 @@ pub fn render(
     info: &SshHostInfo,
     cpu: Option<&CpuInfo>,
     mem: Option<&MemInfo>,
-    disk: Option<&DiskInfo>,
+    disk: Option<&DiskOverview>,
     colors: &TableColors,
 ) -> Row<'static> {
     let bg = if i % 2 == 0 {
