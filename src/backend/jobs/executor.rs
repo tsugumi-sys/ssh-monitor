@@ -193,7 +193,7 @@ async fn test_job_executor() {
                 }
             }
             "disk" => {
-                if let Some(disk_info) = r.value.downcast_ref::<DiskInfo>() {
+                if let Some(disk_info) = r.value.downcast_ref::<Vec<DiskInfo>>() {
                     println!("✅ {} => {:?}", r.job_name, disk_info);
                 } else {
                     println!("✅ {} => (failed to downcast)", r.job_name);

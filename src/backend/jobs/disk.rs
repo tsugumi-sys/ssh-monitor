@@ -11,7 +11,6 @@ pub struct DiskInfo {
     pub used_percent: f32,
 }
 
-/// `JobKind::Disk` によって呼び出されるパース関数
 pub fn parse_disk(output: &str) -> Result<Option<JobResult>> {
     let mut results = vec![];
 

@@ -2,6 +2,7 @@ use directories::ProjectDirs;
 use rusqlite::Connection;
 use std::path::PathBuf;
 pub mod cpu;
+pub mod disk;
 pub mod mem;
 
 fn get_default_db_path() -> PathBuf {
@@ -66,6 +67,23 @@ pub fn init_db_connection() -> Connection {
 
     conn.execute(
         r#"
+        CREATE TABLE IF NOT EXISTS disk_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            host_id TEXT NOT NULL,
+            mount_point TEXT NOT NULL,
+            total_mb INTEGER NOT NULL,
+            used_mb INTEGER NOT NULL,
+            available_mb INTEGER NOT NULL,
+            used_percent REAL NOT NULL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+        "#,
+        [],
+    )
+    .expect("❌ Failed to create disk_results table");
+
+    conn.execute(
+        r#"
         DELETE FROM job_results
         WHERE timestamp < datetime('now', '-1 hour')
         "#,
@@ -73,7 +91,7 @@ pub fn init_db_connection() -> Connection {
     )
     .expect("❌ Failed to delete old job_results");
 
-    for table in ["cpu_results", "mem_results"] {
+    for table in ["cpu_results", "mem_results", "disk_results"] {
         conn.execute(
             &format!(
                 "DELETE FROM {} WHERE timestamp < datetime('now', '-1 hour')",
