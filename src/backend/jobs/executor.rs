@@ -1,4 +1,3 @@
-use crate::backend::db::store_job_result;
 use crate::backend::jobs::job::{JobGroup, JobKind, JobResult};
 use crate::backend::ssh::{connect_ssh_session, run_ssh_command};
 use anyhow::{Result, anyhow};
@@ -54,8 +53,14 @@ async fn run_group_task(group: JobGroup, conn: Arc<Mutex<Connection>>) {
         match run_group_once(group.clone()).await {
             Ok(results) => {
                 for result in results {
-                    if let Err(e) = store_job_result(&conn, &group.host.name, &result).await {
-                        error!("❌ Failed to save result to DB: {e}");
+                    // Find the corresponding JobKind for this result
+                    if let Some(job_kind) = group.jobs.iter().find(|j| j.name() == result.job_name)
+                    {
+                        if let Err(e) = job_kind.save(&conn, &group.host.name, &result).await {
+                            error!("❌ Failed to save {} result to DB: {e}", result.job_name);
+                        }
+                    } else {
+                        error!("❌ Unknown job type: {}", result.job_name);
                     }
                 }
             }
@@ -138,13 +143,15 @@ async fn test_job_executor() {
     let _ = env_logger::builder().is_test(true).try_init();
 
     use crate::backend::db::init_db_connection;
+    use crate::backend::jobs::cpu::CpuInfo;
+    use crate::backend::jobs::disk::DiskInfo;
     use crate::backend::jobs::executor::JobGroupExecutor;
     use crate::backend::jobs::job::{JobGroup, JobKind};
+    use crate::backend::jobs::mem::MemInfo;
     use crate::ssh_config::SshHostInfo;
     use std::{sync::Arc, time::Duration};
     use tokio::sync::Mutex;
 
-    // DBコネクションの初期化（共有）
     let db_conn = Arc::new(Mutex::new(init_db_connection()));
 
     let host = SshHostInfo {
@@ -163,7 +170,6 @@ async fn test_job_executor() {
         jobs: vec![JobKind::Cpu, JobKind::Mem, JobKind::Disk],
     };
 
-    // ExecutorにDBを渡して生成
     let executor = JobGroupExecutor::new(db_conn.clone());
 
     executor.register_group(group).await;
@@ -171,10 +177,31 @@ async fn test_job_executor() {
     let results = executor.run("test").await.unwrap();
 
     for r in results {
-        println!(
-            "✅ {} => {}",
-            r.job_name,
-            serde_json::to_string_pretty(&r.value).unwrap()
-        );
+        match r.job_name.as_str() {
+            "cpu" => {
+                if let Some(cpu_info) = r.value.downcast_ref::<CpuInfo>() {
+                    println!("✅ {} => {:?}", r.job_name, cpu_info);
+                } else {
+                    println!("✅ {} => (failed to downcast)", r.job_name);
+                }
+            }
+            "mem" => {
+                if let Some(mem_info) = r.value.downcast_ref::<MemInfo>() {
+                    println!("✅ {} => {:?}", r.job_name, mem_info);
+                } else {
+                    println!("✅ {} => (failed to downcast)", r.job_name);
+                }
+            }
+            "disk" => {
+                if let Some(disk_info) = r.value.downcast_ref::<DiskInfo>() {
+                    println!("✅ {} => {:?}", r.job_name, disk_info);
+                } else {
+                    println!("✅ {} => (failed to downcast)", r.job_name);
+                }
+            }
+            _ => {
+                println!("✅ {} => {:?}", r.job_name, r.value);
+            }
+        }
     }
 }

@@ -6,6 +6,7 @@ use serde_json::to_string;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+pub mod cpu;
 
 fn get_default_db_path() -> PathBuf {
     let proj_dirs = ProjectDirs::from("com", "tsugumi-sys", "SshMonitor")
@@ -72,21 +73,4 @@ pub fn init_db_connection() -> Connection {
     }
 
     conn
-}
-
-pub async fn store_job_result(
-    conn: &Arc<Mutex<Connection>>,
-    host_id: &str,
-    result: &JobResult,
-) -> Result<()> {
-    let value_json = to_string(&result.value)?;
-    let conn = conn.lock().await;
-    conn.execute(
-        r#"
-        INSERT INTO job_results (host_id, job_name, value_json)
-        VALUES (?1, ?2, ?3)
-        "#,
-        params![host_id, result.job_name, value_json],
-    )?;
-    Ok(())
 }

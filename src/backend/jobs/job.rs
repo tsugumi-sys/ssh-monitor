@@ -1,11 +1,15 @@
 use crate::ssh_config::SshHostInfo;
 use anyhow::Result;
 use erased_serde::Serialize;
+use rusqlite::Connection;
+use std::any::Any;
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::Mutex;
 
 pub struct JobResult {
     pub job_name: String,
-    pub value: Box<dyn Serialize + Send + Sync>,
+    pub value: Box<dyn Any + Send + Sync>,
 }
 
 #[derive(Clone)]
@@ -47,6 +51,43 @@ impl JobKind {
             JobKind::Cpu => crate::backend::jobs::cpu::parse_cpu(output),
             JobKind::Mem => crate::backend::jobs::mem::parse_mem(output),
             JobKind::Disk => crate::backend::jobs::disk::parse_disk(output),
+        }
+    }
+
+    pub async fn save(
+        &self,
+        conn: &Arc<Mutex<Connection>>,
+        host_id: &str,
+        result: &JobResult,
+    ) -> Result<()> {
+        match self {
+            JobKind::Cpu => {
+                use crate::backend::db::cpu::commands::{CpuResultInsert, store_cpu_result};
+                use crate::backend::jobs::cpu::CpuInfo;
+
+                let cpu_info = result
+                    .value
+                    .downcast_ref::<CpuInfo>()
+                    .ok_or_else(|| anyhow::anyhow!("Expected CpuInfo for JobKind::Cpu"))?;
+
+                let insert = CpuResultInsert {
+                    host_id: host_id.to_string(),
+                    model_name: cpu_info.model_name.clone(),
+                    core_count: cpu_info.core_count as u32,
+                    usage_percent: cpu_info.usage_percent,
+                    per_core: cpu_info.per_core.clone(),
+                };
+
+                store_cpu_result(conn, &insert).await
+            }
+            JobKind::Mem => {
+                // TODO: implement mem insertion logic here
+                Ok(())
+            }
+            JobKind::Disk => {
+                // TODO: implement disk insertion logic here
+                Ok(())
+            }
         }
     }
 }
