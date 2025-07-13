@@ -81,8 +81,20 @@ impl JobKind {
                 store_cpu_result(conn, &insert).await
             }
             JobKind::Mem => {
-                // TODO: implement mem insertion logic here
-                Ok(())
+                use crate::backend::db::mem::commands::{MemResultInsert, store_mem_result};
+                use crate::backend::jobs::mem::MemInfo;
+                let mem_info = result
+                    .value
+                    .downcast_ref::<MemInfo>()
+                    .ok_or_else(|| anyhow::anyhow!("Expected MemInfo for JobKind::Mem"))?;
+                let insert = MemResultInsert {
+                    host_id: host_id.to_string(),
+                    total_mb: mem_info.total_mb,
+                    used_mb: mem_info.used_mb,
+                    free_mb: mem_info.free_mb,
+                    used_percent: mem_info.used_percent,
+                };
+                store_mem_result(conn, &insert).await
             }
             JobKind::Disk => {
                 // TODO: implement disk insertion logic here
