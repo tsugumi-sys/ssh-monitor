@@ -1,9 +1,13 @@
 use super::themed_table::TableColors;
 use super::view_table_row::render as render_table_row;
+use crate::ssh_config::SshHostInfo;
+use crate::tui::list_ssh::states::{CpuSnapshot, CpuStates};
 use crate::{App, AppMode};
+use futures::executor::block_on;
 use ratatui::prelude::*;
 use ratatui::text::Line;
 use ratatui::widgets::*;
+use std::collections::HashMap;
 
 pub fn render(app: &mut App, frame: &mut Frame) {
     let area = frame.area();
@@ -13,13 +17,16 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         .direction(Direction::Vertical)
         .margin(1)
         .constraints([
-            Constraint::Length(3),
-            Constraint::Length(3),
-            Constraint::Min(0),
-            Constraint::Length(3),
+            Constraint::Length(3), // Title / Search
+            Constraint::Length(3), // Connection Summary
+            Constraint::Min(0),    // Table
+            Constraint::Length(3), // Footer
         ])
         .split(area);
 
+    /*
+    Title/Search
+    */
     if app.mode == AppMode::Search {
         let input = Paragraph::new(app.search_query.as_str())
             .block(
@@ -37,7 +44,10 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         frame.render_widget(title, chunks[0]);
     }
 
-    let hosts_guard = futures::executor::block_on(app.ssh_hosts.lock());
+    /*
+    Connection Summary
+    */
+    let hosts_guard = block_on(app.ssh_hosts.lock());
     let hosts = &*hosts_guard;
 
     let connected = 0;
@@ -65,9 +75,14 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 
     frame.render_widget(overview, chunks[1]);
 
-    let grid_area = chunks[2];
-    app.table_height = grid_area.height.saturating_sub(3) as usize;
-    let mut host_entries: Vec<_> = hosts
+    /*
+    Hosts & Other metrics data.
+    */
+    // Prefetch CPU snapshot map safely
+    let cpu_map = block_on(app.cpu_states.snapshot_map());
+    log::debug!("📊 CPU Snapshot Map: {:?}", cpu_map);
+
+    let mut host_entries: Vec<(String, SshHostInfo, Option<CpuSnapshot>)> = hosts
         .iter()
         .filter(|(_, h)| {
             app.search_query.is_empty() || {
@@ -77,11 +92,23 @@ pub fn render(app: &mut App, frame: &mut Frame) {
                     || h.ip.to_lowercase().contains(&q)
             }
         })
-        .map(|(k, v)| (k.clone(), v.clone()))
+        .map(|(k, v)| {
+            let cpu = cpu_map.get(k).cloned();
+            (k.clone(), v.clone(), cpu)
+        })
         .collect();
 
-    host_entries.sort_by_key(|(_, h)| h.name.clone());
-    app.visible_hosts = host_entries.clone();
+    host_entries.sort_by_key(|(_, h, _)| h.name.clone());
+    app.visible_hosts = host_entries
+        .iter()
+        .map(|(id, info, _)| (id.clone(), info.clone()))
+        .collect();
+
+    /*
+    Table
+    */
+    let grid_area = chunks[2];
+    app.table_height = grid_area.height.saturating_sub(3) as usize;
 
     let visible_rows = grid_area.height.max(1) as usize;
     app.vertical_scroll_state = app
@@ -98,9 +125,14 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     let rows = host_entries[start_index..end_index]
         .iter()
         .enumerate()
-        .map(|(i, (_id, info))| render_table_row(i, info, &colors));
+        .map(|(i, (_, info, cpu))| render_table_row(i, info, &colors, cpu));
 
-    let header = Row::new(vec![Cell::from("Name"), Cell::from("User@Host:Port")]).style(
+    let header = Row::new(vec![
+        Cell::from("Name"),
+        Cell::from("User@Host:Port"),
+        Cell::from("CPU"),
+    ])
+    .style(
         Style::default()
             .fg(colors.header_fg)
             .bg(colors.header_bg)
@@ -123,6 +155,9 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 
     frame.render_stateful_widget(table, grid_area, &mut app.table_state);
 
+    /*
+    Footer
+    */
     let footer = Paragraph::new(vec![Line::from("ESC: Exit | ↑↓: Scroll | /: Search")])
         .alignment(Alignment::Center)
         .style(

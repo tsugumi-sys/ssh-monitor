@@ -1,5 +1,4 @@
 use eyre::Result;
-use md5;
 use ssh2_config::{Host, ParseRule, SshConfig};
 use std::collections::HashMap;
 use std::sync::Arc;

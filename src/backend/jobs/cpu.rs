@@ -58,11 +58,9 @@ pub fn parse_cpu(output: &str) -> Result<Option<JobResult>> {
 
     let (usage_percent, per_core) = if is_mac {
         let mut sum = 0f32;
-        let mut count = 0;
         for line in stat_part.lines() {
             if let Ok(p) = line.trim().parse::<f32>() {
                 sum += p;
-                count += 1;
             }
         }
         (sum, vec![])

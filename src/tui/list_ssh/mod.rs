@@ -1,3 +1,4 @@
+pub mod states;
 pub mod themed_table;
 pub mod update;
 pub mod view;
