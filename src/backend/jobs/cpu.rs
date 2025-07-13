@@ -2,6 +2,8 @@ use super::job::JobResult;
 use anyhow::Result;
 use serde::Serialize;
 
+pub const CPU_COMMAND: &str = r#"bash -c '(lscpu && echo __STAT__ && top -bn1 -w 512) || (sysctl -a | grep machdep.cpu && echo __STAT__ && ps -A -o %cpu)'"#;
+
 #[derive(Debug, Serialize)]
 pub struct CpuInfo {
     pub model_name: String,

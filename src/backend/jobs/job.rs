@@ -1,3 +1,6 @@
+use super::cpu::CPU_COMMAND;
+use super::disk::DISK_COMMAND;
+use super::mem::MEM_COMMAND;
 use crate::ssh_config::SshHostInfo;
 use anyhow::Result;
 use rusqlite::Connection;
@@ -33,15 +36,9 @@ impl JobKind {
 
     pub fn command(&self) -> String {
         match self {
-            JobKind::Cpu => {
-                r#"bash -c '(lscpu && echo __STAT__ && top -bn1 -w 512) || (sysctl -a | grep machdep.cpu && echo __STAT__ && ps -A -o %cpu)'"#.to_string()
-            }
-            JobKind::Mem => {
-                r#"bash -c 'uname -s && echo __MEM__ && (free -m || (echo __MAC__ && sysctl -n hw.memsize && vm_stat))'"#.to_string()
-            }
-            JobKind::Disk => {
-                "df -Pm | tail -n +2".to_string()
-            }
+            JobKind::Cpu => CPU_COMMAND.to_string(),
+            JobKind::Mem => MEM_COMMAND.to_string(),
+            JobKind::Disk => DISK_COMMAND.to_string(),
         }
     }
 
