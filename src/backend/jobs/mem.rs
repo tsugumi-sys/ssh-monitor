@@ -10,7 +10,6 @@ pub struct MemInfo {
     pub used_percent: f32,
 }
 
-/// `JobKind::Mem` 用のパーサ
 pub fn parse_mem(output: &str) -> Result<Option<JobResult>> {
     let mut sections = output.split("__MEM__");
     let platform = sections

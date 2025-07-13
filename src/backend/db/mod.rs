@@ -1,12 +1,8 @@
-use crate::backend::jobs::job::JobResult;
-use anyhow::Result;
 use directories::ProjectDirs;
-use rusqlite::{Connection, params};
-use serde_json::to_string;
+use rusqlite::Connection;
 use std::path::PathBuf;
-use std::sync::Arc;
-use tokio::sync::Mutex;
 pub mod cpu;
+pub mod mem;
 
 fn get_default_db_path() -> PathBuf {
     let proj_dirs = ProjectDirs::from("com", "tsugumi-sys", "SshMonitor")
@@ -54,6 +50,22 @@ pub fn init_db_connection() -> Connection {
 
     conn.execute(
         r#"
+        CREATE TABLE IF NOT EXISTS mem_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            host_id TEXT NOT NULL,
+            total_mb INTEGER NOT NULL,
+            used_mb INTEGER NOT NULL,
+            free_mb INTEGER NOT NULL,
+            used_percent REAL NOT NULL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+        "#,
+        [],
+    )
+    .expect("❌ Failed to create mem_results table");
+
+    conn.execute(
+        r#"
         DELETE FROM job_results
         WHERE timestamp < datetime('now', '-1 hour')
         "#,
@@ -61,7 +73,7 @@ pub fn init_db_connection() -> Connection {
     )
     .expect("❌ Failed to delete old job_results");
 
-    for table in ["cpu_results"] {
+    for table in ["cpu_results", "mem_results"] {
         conn.execute(
             &format!(
                 "DELETE FROM {} WHERE timestamp < datetime('now', '-1 hour')",
