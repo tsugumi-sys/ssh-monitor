@@ -1,6 +1,5 @@
 use crate::ssh_config::SshHostInfo;
 use anyhow::Result;
-use erased_serde::Serialize;
 use rusqlite::Connection;
 use std::any::Any;
 use std::sync::Arc;
@@ -97,7 +96,26 @@ impl JobKind {
                 store_mem_result(conn, &insert).await
             }
             JobKind::Disk => {
-                // TODO: implement disk insertion logic here
+                use crate::backend::db::disk::commands::{DiskResultInsert, store_disk_result};
+                use crate::backend::jobs::disk::DiskInfo; // 👈 You must match this path exactly
+
+                let disk_infos = result
+                    .value
+                    .downcast_ref::<Vec<DiskInfo>>() // 👈 Make sure it's the exact type as Boxed above
+                    .ok_or_else(|| anyhow::anyhow!("Expected Vec<DiskInfo> for JobKind::Disk"))?;
+
+                for info in disk_infos {
+                    let insert = DiskResultInsert {
+                        host_id: host_id.to_string(),
+                        mount_point: info.mount_point.clone(),
+                        total_mb: info.total_mb,
+                        used_mb: info.used_mb,
+                        available_mb: info.available_mb,
+                        used_percent: info.used_percent,
+                    };
+                    store_disk_result(conn, &insert).await?;
+                }
+
                 Ok(())
             }
         }
