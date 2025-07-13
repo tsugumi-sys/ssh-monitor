@@ -2,6 +2,8 @@ use super::job::JobResult;
 use anyhow::{Result, anyhow};
 use serde::Serialize;
 
+pub const MEM_COMMAND: &str = r#"bash -c 'uname -s && echo __MEM__ && (free -m || (echo __MAC__ && sysctl -n hw.memsize && vm_stat))'"#;
+
 #[derive(Debug, Serialize)]
 pub struct MemInfo {
     pub total_mb: u64,

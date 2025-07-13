@@ -2,6 +2,8 @@ use super::job::JobResult;
 use anyhow::Result;
 use serde::Serialize;
 
+pub const DISK_COMMAND: &str = "df -Pm | tail -n +2";
+
 #[derive(Debug, Serialize)]
 pub struct DiskInfo {
     pub mount_point: String,
