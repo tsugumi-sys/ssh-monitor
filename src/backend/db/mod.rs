@@ -37,12 +37,39 @@ pub fn init_db_connection() -> Connection {
 
     conn.execute(
         r#"
+        CREATE TABLE IF NOT EXISTS cpu_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            host_id TEXT NOT NULL,
+            model_name TEXT NOT NULL,
+            core_count INTEGER NOT NULL,
+            usage_percent REAL NOT NULL,
+            per_core_json TEXT NOT NULL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+        "#,
+        [],
+    )
+    .expect("❌ Failed to create cpu_results table");
+
+    conn.execute(
+        r#"
         DELETE FROM job_results
         WHERE timestamp < datetime('now', '-1 hour')
         "#,
         [],
     )
     .expect("❌ Failed to delete old job_results");
+
+    for table in ["cpu_results"] {
+        conn.execute(
+            &format!(
+                "DELETE FROM {} WHERE timestamp < datetime('now', '-1 hour')",
+                table
+            ),
+            [],
+        )
+        .expect("❌ Failed to delete old metrics");
+    }
 
     conn
 }
