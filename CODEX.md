@@ -20,4 +20,4 @@ And we extract sub components or methods into the other files.
 
 - backend/db: Create database client, initialize database.
 - backend/ssh: Core ssh connection handlers.
-- backend/jobs: All jobs to fetch metrics via ssh. We define each jobs per metrics, and execute them in a certaing group to reduce the ssh connections.
+- backend/jobs: All jobs to fetch metrics via ssh. We define each jobs per metrics, and execute them in a certain group to reduce the ssh connections.
