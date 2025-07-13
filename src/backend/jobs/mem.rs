@@ -49,25 +49,39 @@ pub fn parse_mem(output: &str) -> Result<Option<JobResult>> {
                 None
             }
         }
+
         "Darwin" => {
             let mut lines = mem_output.lines();
+
             let total_bytes = lines
-                .next()
-                .ok_or_else(|| anyhow!("missing hw.memsize"))?
+                .find(|line| line.trim().chars().all(|c| c.is_ascii_digit()))
+                .ok_or_else(|| anyhow!("missing hw.memsize value"))?
                 .trim()
                 .parse::<u64>()
                 .unwrap_or(0);
 
-            let page_size = 4096u64;
+            let mut page_size = 4096u64;
+
             let mut counters = std::collections::HashMap::from([
                 ("Pages active", 0u64),
                 ("Pages speculative", 0u64),
                 ("Pages occupied by compressor", 0u64),
                 ("Pages wired down", 0u64),
-                ("File-backed pages", 0u64),
+                ("Pages inactive", 0u64),
             ]);
 
             for line in lines {
+                if line.contains("page size of") {
+                    if let Some(v) = line
+                        .split("page size of")
+                        .nth(1)
+                        .and_then(|s| s.split_whitespace().next())
+                    {
+                        page_size = v.parse().unwrap_or(4096);
+                    }
+                    continue;
+                }
+
                 if let Some((key, value)) = line.split_once(':') {
                     let val = value.trim().trim_end_matches('.').replace('.', "");
                     if let Ok(count) = val.parse::<u64>() {
@@ -78,6 +92,7 @@ pub fn parse_mem(output: &str) -> Result<Option<JobResult>> {
                 }
             }
 
+            // Only count necessary pages
             let used_pages: u64 = counters.values().sum();
             let used_mb = (used_pages * page_size) / 1024 / 1024;
             let total_mb = total_bytes / 1024 / 1024;
@@ -95,6 +110,7 @@ pub fn parse_mem(output: &str) -> Result<Option<JobResult>> {
                 used_percent: percent,
             })
         }
+
         _ => None,
     };
 
