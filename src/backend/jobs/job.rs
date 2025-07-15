@@ -14,7 +14,7 @@ pub struct JobResult {
     pub value: Box<dyn Any + Send + Sync>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum JobKind {
     Cpu,
     Mem,
@@ -94,11 +94,11 @@ impl JobKind {
             }
             JobKind::Disk => {
                 use crate::backend::db::disk::commands::{DiskResultInsert, store_disk_result};
-                use crate::backend::jobs::disk::DiskInfo; // 👈 You must match this path exactly
+                use crate::backend::jobs::disk::DiskInfo;
 
                 let disk_infos = result
                     .value
-                    .downcast_ref::<Vec<DiskInfo>>() // 👈 Make sure it's the exact type as Boxed above
+                    .downcast_ref::<Vec<DiskInfo>>()
                     .ok_or_else(|| anyhow::anyhow!("Expected Vec<DiskInfo> for JobKind::Disk"))?;
 
                 for info in disk_infos {
@@ -119,7 +119,7 @@ impl JobKind {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct JobGroup {
     pub name: String,
     pub interval: Duration,

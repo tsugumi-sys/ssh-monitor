@@ -9,7 +9,7 @@ use tokio::{
     task, time,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct JobGroupExecutor {
     groups: Arc<RwLock<HashMap<String, JobGroup>>>,
     db: Arc<Mutex<Connection>>,
@@ -56,7 +56,7 @@ async fn run_group_task(group: JobGroup, conn: Arc<Mutex<Connection>>) {
                     // Find the corresponding JobKind for this result
                     if let Some(job_kind) = group.jobs.iter().find(|j| j.name() == result.job_name)
                     {
-                        if let Err(e) = job_kind.save(&conn, &group.host.name, &result).await {
+                        if let Err(e) = job_kind.save(&conn, &group.host.id, &result).await {
                             error!("❌ Failed to save {} result to DB: {e}", result.job_name);
                         }
                     } else {

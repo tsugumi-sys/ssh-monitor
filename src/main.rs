@@ -1,5 +1,7 @@
 mod backend;
 use backend::db::init_db_connection;
+use backend::jobs::executor::JobGroupExecutor;
+use backend::jobs::job::{JobGroup, JobKind};
 mod ssh_config;
 use color_eyre::Result;
 use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyEventKind};
@@ -9,9 +11,11 @@ use ratatui::{DefaultTerminal, Frame, widgets::ScrollbarState};
 use rusqlite::Connection;
 use ssh_config::{SharedSshHosts, SshHostInfo, load_ssh_configs};
 mod tui;
-use std::sync::Arc;
+use crate::tui::list_ssh::states::ListSshJobKind;
+use crate::tui::states_update::{StatesJobExecutor, StatesJobGroup};
+use std::{sync::Arc, time::Duration};
 use tokio::sync::Mutex;
-use tui::list_ssh::{handle_key as handle_list_key, render as render_list};
+use tui::list_ssh::{handle_key as handle_list_key, render as render_list, states::CpuStates};
 
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {
@@ -36,6 +40,7 @@ pub struct App {
     pub mode: AppMode,
     pub db: Arc<Mutex<Connection>>,
     pub ssh_hosts: SharedSshHosts,
+    pub cpu_states: Arc<CpuStates>,
     pub table_state: TableState,
     pub table_height: usize,
     pub selected_id: Option<String>,
@@ -54,12 +59,15 @@ impl App {
             .collect();
         visible_hosts.sort_by_key(|(_, h)| h.name.clone());
         let selected_id = visible_hosts.first().map(|(id, _)| id.clone());
+        let db = Arc::new(Mutex::new(init_db_connection()));
+        let cpu_states = Arc::new(CpuStates::new());
         Self {
             running: false,
             event_stream: EventStream::new(),
             mode: AppMode::List,
-            db: Arc::new(Mutex::new(init_db_connection())),
+            db,
             ssh_hosts: Arc::new(Mutex::new(ssh_hosts)),
+            cpu_states,
             // Table
             table_height: 0,
             table_state: TableState::default().with_selected(Some(0)),
@@ -73,8 +81,10 @@ impl App {
         }
     }
 
-    /// Run the application's main loop.
     pub async fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
+        let _executor = self.register_job_groups().await;
+        // let _status_executor = self.register_status_update_jobs().await;
+
         self.running = true;
         while self.running {
             terminal.draw(|frame| self.draw(frame))?;
@@ -166,5 +176,37 @@ impl App {
                 self.selected_id = Some(id.clone());
             }
         }
+    }
+
+    pub async fn register_job_groups(&self) -> JobGroupExecutor {
+        let executor = JobGroupExecutor::new(self.db.clone());
+
+        let hosts = self.ssh_hosts.lock().await;
+        for (host_id, host) in hosts.iter() {
+            let group = JobGroup {
+                name: host_id.clone(),
+                interval: std::time::Duration::from_secs(1),
+                host: host.clone(),
+                jobs: vec![JobKind::Cpu, JobKind::Mem, JobKind::Disk],
+            };
+
+            executor.register_group(group).await;
+        }
+
+        executor.run_all().await;
+        executor
+    }
+
+    pub async fn register_status_update_jobs(&self) -> StatesJobExecutor<ListSshJobKind> {
+        let list_executor = StatesJobExecutor::new(self.db.clone());
+        let list_job_group = StatesJobGroup {
+            name: "list_view".to_string(),
+            interval: Duration::from_secs(5),
+            jobs: vec![ListSshJobKind::Cpu(self.cpu_states.clone())],
+        };
+
+        list_executor.register_group(list_job_group).await;
+        list_executor.run_all().await;
+        list_executor
     }
 }
