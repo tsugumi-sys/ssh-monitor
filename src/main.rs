@@ -201,7 +201,7 @@ impl App {
         for (host_id, host) in hosts.iter() {
             let group = JobGroup {
                 name: host_id.clone(),
-                interval: std::time::Duration::from_secs(1),
+                interval: std::time::Duration::from_secs(10),
                 host: host.clone(),
                 jobs: vec![JobKind::Cpu, JobKind::Mem, JobKind::Disk],
             };
