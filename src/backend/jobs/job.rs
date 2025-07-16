@@ -9,6 +9,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
 
+#[derive(Debug)]
 pub struct JobResult {
     pub job_name: String,
     pub value: Box<dyn Any + Send + Sync>,
