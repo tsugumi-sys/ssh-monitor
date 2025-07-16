@@ -39,6 +39,7 @@ impl JobGroupExecutor {
         groups.insert(group.name.clone(), group);
     }
 
+    #[allow(dead_code)]
     pub async fn run(&self, name: &str) -> Result<Vec<JobResult>> {
         let groups = self.groups.read().await;
         if let Some(group) = groups.get(name) {
