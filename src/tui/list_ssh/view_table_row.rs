@@ -24,7 +24,7 @@ pub fn render(
     // Format CPU usage text
     let cpu_text = cpu
         .as_ref()
-        .map(|c| format!("{:.1}% / {}c", c.usage_percent, c.core_count))
+        .map(|c| format!("{:.1}% / {}cores", c.usage_percent, c.core_count))
         .unwrap_or_else(|| "-".to_string());
 
     Row::new(vec![
