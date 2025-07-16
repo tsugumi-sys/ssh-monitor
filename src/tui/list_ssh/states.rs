@@ -19,6 +19,12 @@ pub struct CpuStates {
     data: Arc<RwLock<HashMap<String, CpuSnapshot>>>,
 }
 
+impl Default for CpuStates {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CpuStates {
     pub fn new() -> Self {
         Self {

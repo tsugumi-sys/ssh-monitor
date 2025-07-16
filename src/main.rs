@@ -50,6 +50,12 @@ pub struct App {
     pub visible_hosts: Vec<(String, SshHostInfo)>,
 }
 
+impl Default for App {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl App {
     pub fn new() -> Self {
         let ssh_hosts = load_ssh_configs().unwrap_or_default(); // now a HashMap
@@ -124,18 +130,15 @@ impl App {
     async fn handle_crossterm_events(&mut self) -> Result<()> {
         tokio::select! {
             event = self.event_stream.next().fuse() => {
-                match event {
-                    Some(Ok(evt)) => {
-                        match evt {
-                            Event::Key(key)
-                                if key.kind == KeyEventKind::Press
-                                    => self.on_key_event(key),
-                            Event::Mouse(_) => {}
-                            Event::Resize(_, _) => {}
-                            _ => {}
-                        }
+                if let Some(Ok(evt)) = event {
+                    match evt {
+                        Event::Key(key)
+                            if key.kind == KeyEventKind::Press
+                                => self.on_key_event(key),
+                        Event::Mouse(_) => {}
+                        Event::Resize(_, _) => {}
+                        _ => {}
                     }
-                    _ => {}
                 }
             }
             _ = tokio::time::sleep(tokio::time::Duration::from_millis(100)) => {
