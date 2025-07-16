@@ -82,7 +82,9 @@ impl App {
     }
 
     pub async fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
-        let _executor = self.register_job_groups().await;
+        let executor = self.register_job_groups().await;
+        let exec_clone = executor.clone();
+        tokio::spawn(async move { exec_clone.run_all().await });
         // let _status_executor = self.register_status_update_jobs().await;
 
         self.running = true;
@@ -193,7 +195,6 @@ impl App {
             executor.register_group(group).await;
         }
 
-        executor.run_all().await;
         executor
     }
 
