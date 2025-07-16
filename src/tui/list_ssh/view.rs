@@ -1,13 +1,12 @@
 use super::themed_table::TableColors;
 use super::view_table_row::render as render_table_row;
 use crate::ssh_config::SshHostInfo;
-use crate::tui::list_ssh::states::{CpuSnapshot, CpuStates};
+use crate::tui::list_ssh::states::CpuSnapshot;
 use crate::{App, AppMode};
 use futures::executor::block_on;
 use ratatui::prelude::*;
 use ratatui::text::Line;
 use ratatui::widgets::*;
-use std::collections::HashMap;
 
 pub fn render(app: &mut App, frame: &mut Frame) {
     let area = frame.area();

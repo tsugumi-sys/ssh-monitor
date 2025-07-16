@@ -1,6 +1,6 @@
 use crate::backend::jobs::job::{JobGroup, JobKind, JobResult};
 use crate::backend::ssh::{connect_ssh_session, run_ssh_command};
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use log::{error, info, warn};
 use rusqlite::Connection;
 use std::{collections::HashMap, sync::Arc};
@@ -55,7 +55,6 @@ async fn run_group_task(group: JobGroup, conn: Arc<Mutex<Connection>>) {
         match timeout(timeout_duration, run_group_once(group.clone())).await {
             Ok(Ok(results)) => {
                 for result in results {
-                    // Find the corresponding JobKind for this result
                     if let Some(job_kind) = group.jobs.iter().find(|j| j.name() == result.job_name)
                     {
                         if let Err(e) = job_kind.save(&conn, &group.host.id, &result).await {
@@ -67,10 +66,10 @@ async fn run_group_task(group: JobGroup, conn: Arc<Mutex<Connection>>) {
                 }
             }
             Ok(Err(e)) => {
-                warn!("❌ Error running group '{}': {e}", group.name);
+                warn!("❌ Error running group '{:?}': {:?}", group.name, e);
             }
             Err(e) => {
-                warn!("❌ Error running group '{}': {e}", group.name);
+                warn!("❌ Timeout while running group '{}': {e}", group.name);
             }
         }
         time::sleep(group.interval).await;
@@ -82,15 +81,25 @@ async fn run_group_once(group: JobGroup) -> Result<Vec<JobResult>> {
 
     let Some(full_cmd) = build_combined_command(&group.jobs) else {
         warn!("⚠️ No jobs in group '{}'", group.name);
-        return Ok(vec![]);
+        return Ok(vec![]); // Return empty results instead of raising an error
     };
     info!("📜 Full command to execute:\n{}", full_cmd);
 
-    let session =
-        connect_ssh_session(&group.host).map_err(|e| anyhow!("SSH connect error: {}", e))?;
+    let session = match connect_ssh_session(&group.host) {
+        Ok(session) => session,
+        Err(e) => {
+            warn!("❌ SSH connection failed for group '{}': {e}", group.name);
+            return Ok(vec![]); // Return empty results if connection fails
+        }
+    };
 
-    let output =
-        run_ssh_command(&session, &full_cmd).map_err(|e| anyhow!("SSH exec error: {}", e))?;
+    let output = match run_ssh_command(&session, &full_cmd) {
+        Ok(output) => output,
+        Err(e) => {
+            warn!("❌ SSH execution failed for group '{}': {e}", group.name);
+            return Ok(vec![]); // Return empty results if command execution fails
+        }
+    };
 
     info!("🖨️ SSH Output:\n{}", output);
 
