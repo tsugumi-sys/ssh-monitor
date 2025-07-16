@@ -13,7 +13,7 @@ async fn test_cpu_job_executor_runs() {
 
     let db = Arc::new(Mutex::new(init_db_connection()));
     let cpu_states = CpuStates::new();
-    let job = ListSshJobKind::Cpu(cpu_states.clone());
+    let job = ListSshJobKind::Cpu(cpu_states.clone().into());
 
     // Insert a fake CPU result for host_id = "test-host"
     {

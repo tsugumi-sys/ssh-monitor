@@ -82,8 +82,24 @@ impl App {
     }
 
     pub async fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
-        let _executor = self.register_job_groups().await;
-        // let _status_executor = self.register_status_update_jobs().await;
+        let executor = JobGroupExecutor::new(self.db.clone());
+
+        {
+            let hosts = self.ssh_hosts.lock().await;
+            for (host_id, host) in hosts.iter() {
+                let group = JobGroup {
+                    name: host_id.clone(),
+                    interval: std::time::Duration::from_secs(1),
+                    host: host.clone(),
+                    jobs: vec![JobKind::Cpu, JobKind::Mem, JobKind::Disk],
+                };
+
+                executor.register_group(group).await;
+            }
+        }
+
+        executor.run_all().await;
+        let _status_executor = self.register_status_update_jobs().await;
 
         self.running = true;
         while self.running {
@@ -178,7 +194,7 @@ impl App {
         }
     }
 
-    pub async fn register_job_groups(&self) -> JobGroupExecutor {
+    pub async fn register_job_groups(&self) {
         let executor = JobGroupExecutor::new(self.db.clone());
 
         let hosts = self.ssh_hosts.lock().await;
@@ -194,10 +210,9 @@ impl App {
         }
 
         executor.run_all().await;
-        executor
     }
 
-    pub async fn register_status_update_jobs(&self) -> StatesJobExecutor<ListSshJobKind> {
+    pub async fn register_status_update_jobs(&self) {
         let list_executor = StatesJobExecutor::new(self.db.clone());
         let list_job_group = StatesJobGroup {
             name: "list_view".to_string(),
@@ -207,6 +222,5 @@ impl App {
 
         list_executor.register_group(list_job_group).await;
         list_executor.run_all().await;
-        list_executor
     }
 }

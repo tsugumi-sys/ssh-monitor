@@ -1,14 +1,22 @@
 use crate::ssh_config::SshHostInfo;
 use ssh2::Session;
 use std::io::Read;
-use std::net::TcpStream;
+use std::net::{SocketAddr, TcpStream};
 use std::path::PathBuf;
+use std::time::Duration;
 
-/// Tries to establish an authenticated SSH session.
-/// Returns `Session` on success or an error string on failure.
 pub fn connect_ssh_session(info: &SshHostInfo) -> Result<Session, String> {
-    let addr = format!("{}:{}", info.ip, info.port);
-    let tcp = TcpStream::connect(&addr).map_err(|e| format!("TCP error: {}", e))?;
+    let socket_addr = match info.ip.as_str() {
+        "localhost" => "127.0.0.1".to_string(),
+        _ => info.ip.clone(),
+    };
+
+    // Construct SocketAddr from resolved address
+    let socket_addr = format!("{}:{}", socket_addr, info.port)
+        .parse::<SocketAddr>()
+        .map_err(|e| format!("Invalid address: {}", e))?;
+    let tcp = TcpStream::connect_timeout(&socket_addr, Duration::from_secs(1))
+        .map_err(|e| format!("TCP error: {}", e))?;
 
     let mut session = Session::new().map_err(|e| format!("Session error: {}", e))?;
 

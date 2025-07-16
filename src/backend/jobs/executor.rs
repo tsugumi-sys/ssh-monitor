@@ -4,9 +4,10 @@ use anyhow::{Result, anyhow};
 use log::{error, info, warn};
 use rusqlite::Connection;
 use std::{collections::HashMap, sync::Arc};
+use tokio::time::{self, Duration, timeout};
 use tokio::{
     sync::{Mutex, RwLock},
-    task, time,
+    task,
 };
 
 #[derive(Clone, Debug)]
@@ -50,22 +51,26 @@ impl JobGroupExecutor {
 
 async fn run_group_task(group: JobGroup, conn: Arc<Mutex<Connection>>) {
     loop {
-        match run_group_once(group.clone()).await {
-            Ok(results) => {
+        let timeout_duration = Duration::from_secs(5);
+        match timeout(timeout_duration, run_group_once(group.clone())).await {
+            Ok(Ok(results)) => {
                 for result in results {
                     // Find the corresponding JobKind for this result
                     if let Some(job_kind) = group.jobs.iter().find(|j| j.name() == result.job_name)
                     {
                         if let Err(e) = job_kind.save(&conn, &group.host.id, &result).await {
-                            error!("❌ Failed to save {} result to DB: {e}", result.job_name);
+                            warn!("❌ Failed to save {} result to DB: {e}", result.job_name);
                         }
                     } else {
-                        error!("❌ Unknown job type: {}", result.job_name);
+                        warn!("❌ Unknown job type: {}", result.job_name);
                     }
                 }
             }
+            Ok(Err(e)) => {
+                warn!("❌ Error running group '{}': {e}", group.name);
+            }
             Err(e) => {
-                error!("❌ Error running group '{}': {e}", group.name);
+                warn!("❌ Error running group '{}': {e}", group.name);
             }
         }
         time::sleep(group.interval).await;
