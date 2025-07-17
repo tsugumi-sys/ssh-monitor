@@ -1,6 +1,6 @@
 use super::themed_table::TableColors;
 use crate::ssh_config::SshHostInfo;
-use crate::tui::list_ssh::states::CpuSnapshot;
+use crate::tui::list_ssh::states::{CpuSnapshot, DiskSnapshot};
 use ratatui::prelude::*;
 use ratatui::widgets::*;
 
@@ -10,6 +10,7 @@ pub fn render(
     info: &SshHostInfo,
     colors: &TableColors,
     cpu: &Option<CpuSnapshot>,
+    disk: &Option<DiskSnapshot>,
 ) -> Row<'static> {
     // Alternate row background
     let bg = if i % 2 == 0 {
@@ -27,10 +28,24 @@ pub fn render(
         .map(|c| format!("{:.1}% / {}cores", c.usage_percent, c.core_count))
         .unwrap_or_else(|| "-".to_string());
 
+    // Format disk usage text
+    let disk_text = disk
+        .as_ref()
+        .map(|d| {
+            let gb = d.total_mb as f64 / 1024.0;
+            if gb >= 1024.0 {
+                format!("{:.1}% / {:.1}TB", d.used_percent, gb / 1024.0)
+            } else {
+                format!("{:.1}% / {:.1}GB", d.used_percent, gb)
+            }
+        })
+        .unwrap_or_else(|| "-".to_string());
+
     Row::new(vec![
         Cell::from(info.name.clone()),
         Cell::from(user_at_host),
         Cell::from(cpu_text),
+        Cell::from(disk_text),
     ])
     .style(Style::default().bg(bg))
     .height(2)

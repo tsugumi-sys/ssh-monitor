@@ -1,7 +1,7 @@
 use super::themed_table::TableColors;
 use super::view_table_row::render as render_table_row;
 use crate::ssh_config::SshHostInfo;
-use crate::tui::list_ssh::states::CpuSnapshot;
+use crate::tui::list_ssh::states::{CpuSnapshot, DiskSnapshot};
 use crate::{App, AppMode};
 use futures::executor::block_on;
 use ratatui::prelude::*;
@@ -77,11 +77,18 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     /*
     Hosts & Other metrics data.
     */
-    // Prefetch CPU snapshot map safely
+    // Prefetch CPU and Disk snapshot maps safely
     let cpu_map = block_on(app.cpu_states.snapshot_map());
+    let disk_map = block_on(app.disk_states.snapshot_map());
     log::debug!("📊 CPU Snapshot Map: {:?}", cpu_map);
+    log::debug!("💽 Disk Snapshot Map: {:?}", disk_map);
 
-    let mut host_entries: Vec<(String, SshHostInfo, Option<CpuSnapshot>)> = hosts
+    let mut host_entries: Vec<(
+        String,
+        SshHostInfo,
+        Option<CpuSnapshot>,
+        Option<DiskSnapshot>,
+    )> = hosts
         .iter()
         .filter(|(_, h)| {
             app.search_query.is_empty() || {
@@ -93,14 +100,15 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         })
         .map(|(k, v)| {
             let cpu = cpu_map.get(k).cloned();
-            (k.clone(), v.clone(), cpu)
+            let disk = disk_map.get(k).cloned();
+            (k.clone(), v.clone(), cpu, disk)
         })
         .collect();
 
-    host_entries.sort_by_key(|(_, h, _)| h.name.clone());
+    host_entries.sort_by_key(|(_, h, _, _)| h.name.clone());
     app.visible_hosts = host_entries
         .iter()
-        .map(|(id, info, _)| (id.clone(), info.clone()))
+        .map(|(id, info, _, _)| (id.clone(), info.clone()))
         .collect();
 
     /*
@@ -124,12 +132,13 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     let rows = host_entries[start_index..end_index]
         .iter()
         .enumerate()
-        .map(|(i, (_, info, cpu))| render_table_row(i, info, &colors, cpu));
+        .map(|(i, (_, info, cpu, disk))| render_table_row(i, info, &colors, cpu, disk));
 
     let header = Row::new(vec![
         Cell::from("Name"),
         Cell::from("User@Host:Port"),
         Cell::from("CPU"),
+        Cell::from("Disk"),
     ])
     .style(
         Style::default()
@@ -144,6 +153,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
             Constraint::Length(16),
             Constraint::Length(40),
             Constraint::Length(16),
+            Constraint::Length(20),
         ],
     )
     .header(header)
