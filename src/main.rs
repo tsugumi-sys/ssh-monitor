@@ -15,7 +15,10 @@ use crate::tui::list_ssh::states::ListSshJobKind;
 use crate::tui::states_update::{StatesJobExecutor, StatesJobGroup};
 use std::{sync::Arc, time::Duration};
 use tokio::sync::Mutex;
-use tui::list_ssh::{handle_key as handle_list_key, render as render_list, states::CpuStates};
+use tui::list_ssh::{
+    handle_key as handle_list_key, render as render_list,
+    states::{CpuStates, DiskStates},
+};
 
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {
@@ -41,6 +44,7 @@ pub struct App {
     pub db: Arc<Mutex<Connection>>,
     pub ssh_hosts: SharedSshHosts,
     pub cpu_states: Arc<CpuStates>,
+    pub disk_states: Arc<DiskStates>,
     pub table_state: TableState,
     pub table_height: usize,
     pub selected_id: Option<String>,
@@ -67,6 +71,7 @@ impl App {
         let selected_id = visible_hosts.first().map(|(id, _)| id.clone());
         let db = Arc::new(Mutex::new(init_db_connection()));
         let cpu_states = Arc::new(CpuStates::new());
+        let disk_states = Arc::new(DiskStates::new());
         Self {
             running: false,
             event_stream: EventStream::new(),
@@ -74,6 +79,7 @@ impl App {
             db,
             ssh_hosts: Arc::new(Mutex::new(ssh_hosts)),
             cpu_states,
+            disk_states,
             // Table
             table_height: 0,
             table_state: TableState::default().with_selected(Some(0)),
@@ -220,7 +226,10 @@ impl App {
         let list_job_group = StatesJobGroup {
             name: "list_view".to_string(),
             interval: Duration::from_secs(5),
-            jobs: vec![ListSshJobKind::Cpu(self.cpu_states.clone())],
+            jobs: vec![
+                ListSshJobKind::Cpu(self.cpu_states.clone()),
+                ListSshJobKind::Disk(self.disk_states.clone()),
+            ],
         };
 
         list_executor.register_group(list_job_group).await;
