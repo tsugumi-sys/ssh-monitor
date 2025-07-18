@@ -1,5 +1,6 @@
 use crate::backend::db::cpu::queries as cpu_queries;
 use crate::backend::db::disk::queries as disk_queries;
+use crate::backend::db::mem::queries as mem_queries;
 use crate::tui::states_update::StateJob;
 use anyhow::Result;
 use rusqlite::Connection;
@@ -20,6 +21,14 @@ pub struct DiskSnapshot {
     pub used_percent: f32,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct MemSnapshot {
+    pub total_mb: u64,
+    pub used_mb: u64,
+    pub free_mb: u64,
+    pub used_percent: f32,
+}
+
 #[derive(Debug, Clone)]
 pub struct CpuStates {
     data: Arc<RwLock<HashMap<String, CpuSnapshot>>>,
@@ -37,6 +46,17 @@ pub struct DiskStates {
 }
 
 impl Default for DiskStates {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct MemStates {
+    data: Arc<RwLock<HashMap<String, MemSnapshot>>>,
+}
+
+impl Default for MemStates {
     fn default() -> Self {
         Self::new()
     }
@@ -77,6 +97,41 @@ impl DiskStates {
     }
 
     pub async fn snapshot_map(&self) -> HashMap<String, DiskSnapshot> {
+        self.data.read().await.clone()
+    }
+}
+
+impl MemStates {
+    pub fn new() -> Self {
+        Self {
+            data: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    pub async fn get(&self, host_id: &str) -> Option<MemSnapshot> {
+        self.data.read().await.get(host_id).cloned()
+    }
+
+    pub async fn update_from_db(&self, conn: &Arc<Mutex<Connection>>) -> Result<()> {
+        let rows = mem_queries::fetch_latest_mem_all(conn).await?;
+        log::info!("Fetched {} mem rows from DB", rows.len());
+        let mut map = self.data.write().await;
+        map.clear();
+        for row in rows {
+            map.insert(
+                row.host_id,
+                MemSnapshot {
+                    total_mb: row.total_mb,
+                    used_mb: row.used_mb,
+                    free_mb: row.free_mb,
+                    used_percent: row.used_percent,
+                },
+            );
+        }
+        Ok(())
+    }
+
+    pub async fn snapshot_map(&self) -> HashMap<String, MemSnapshot> {
         self.data.read().await.clone()
     }
 }
@@ -127,6 +182,7 @@ impl CpuStates {
 #[derive(Clone, Debug)]
 pub enum ListSshJobKind {
     Cpu(Arc<CpuStates>),
+    Mem(Arc<MemStates>),
     Disk(Arc<DiskStates>),
 }
 
@@ -135,6 +191,7 @@ impl StateJob for ListSshJobKind {
     fn name(&self) -> &'static str {
         match self {
             ListSshJobKind::Cpu(_) => "cpu",
+            ListSshJobKind::Mem(_) => "mem",
             ListSshJobKind::Disk(_) => "disk",
         }
     }
@@ -142,6 +199,7 @@ impl StateJob for ListSshJobKind {
     async fn update(&self, conn: &Arc<Mutex<Connection>>) -> Result<()> {
         match self {
             ListSshJobKind::Cpu(state) => state.update_from_db(conn).await,
+            ListSshJobKind::Mem(state) => state.update_from_db(conn).await,
             ListSshJobKind::Disk(state) => state.update_from_db(conn).await,
         }
     }
