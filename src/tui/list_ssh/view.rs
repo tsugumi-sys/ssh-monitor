@@ -1,12 +1,20 @@
 use super::themed_table::TableColors;
 use super::view_table_row::render as render_table_row;
 use crate::ssh_config::SshHostInfo;
-use crate::tui::list_ssh::states::{CpuSnapshot, DiskSnapshot};
+use crate::tui::list_ssh::states::{CpuSnapshot, DiskSnapshot, MemSnapshot};
 use crate::{App, AppMode};
 use futures::executor::block_on;
 use ratatui::prelude::*;
 use ratatui::text::Line;
 use ratatui::widgets::*;
+
+type HostEntry = (
+    String,               // Host ID
+    SshHostInfo,          // Host info
+    Option<CpuSnapshot>,  // CPU Snapshot
+    Option<MemSnapshot>,  // Memory Snapshot
+    Option<DiskSnapshot>, // Disk Snapshot
+);
 
 pub fn render(app: &mut App, frame: &mut Frame) {
     let area = frame.area();
@@ -77,18 +85,15 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     /*
     Hosts & Other metrics data.
     */
-    // Prefetch CPU and Disk snapshot maps safely
+    // Prefetch CPU, Memory and Disk snapshot maps safely
     let cpu_map = block_on(app.cpu_states.snapshot_map());
+    let mem_map = block_on(app.mem_states.snapshot_map());
     let disk_map = block_on(app.disk_states.snapshot_map());
     log::debug!("📊 CPU Snapshot Map: {:?}", cpu_map);
+    log::debug!("🧠 Mem Snapshot Map: {:?}", mem_map);
     log::debug!("💽 Disk Snapshot Map: {:?}", disk_map);
 
-    let mut host_entries: Vec<(
-        String,
-        SshHostInfo,
-        Option<CpuSnapshot>,
-        Option<DiskSnapshot>,
-    )> = hosts
+    let mut host_entries: Vec<HostEntry> = hosts
         .iter()
         .filter(|(_, h)| {
             app.search_query.is_empty() || {
@@ -100,15 +105,16 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         })
         .map(|(k, v)| {
             let cpu = cpu_map.get(k).cloned();
+            let mem = mem_map.get(k).cloned();
             let disk = disk_map.get(k).cloned();
-            (k.clone(), v.clone(), cpu, disk)
+            (k.clone(), v.clone(), cpu, mem, disk)
         })
         .collect();
 
-    host_entries.sort_by_key(|(_, h, _, _)| h.name.clone());
+    host_entries.sort_by_key(|(_, h, _, _, _)| h.name.clone());
     app.visible_hosts = host_entries
         .iter()
-        .map(|(id, info, _, _)| (id.clone(), info.clone()))
+        .map(|(id, info, _, _, _)| (id.clone(), info.clone()))
         .collect();
 
     /*
@@ -132,12 +138,13 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     let rows = host_entries[start_index..end_index]
         .iter()
         .enumerate()
-        .map(|(i, (_, info, cpu, disk))| render_table_row(i, info, &colors, cpu, disk));
+        .map(|(i, (_, info, cpu, mem, disk))| render_table_row(i, info, &colors, cpu, mem, disk));
 
     let header = Row::new(vec![
         Cell::from("Name"),
         Cell::from("User@Host:Port"),
         Cell::from("CPU"),
+        Cell::from("Mem"),
         Cell::from("Disk"),
     ])
     .style(
@@ -152,6 +159,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         [
             Constraint::Length(16),
             Constraint::Length(40),
+            Constraint::Length(16),
             Constraint::Length(16),
             Constraint::Length(20),
         ],
