@@ -175,7 +175,10 @@ async fn test_job_executor() {
         ip: "localhost".to_string(),
         port: 22,
         user: "akira.noda".to_string(),
-        identity_file: format!("{}/.ssh/id_ed25519", std::env::var("HOME").unwrap()),
+        identity_file: format!(
+            "{}/.ssh/id_ed25519",
+            std::env::var("HOME").unwrap_or_else(|_| std::env::var("USERPROFILE").unwrap())
+        ),
     };
 
     let group = JobGroup {
