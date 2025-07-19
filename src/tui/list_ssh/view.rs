@@ -1,5 +1,6 @@
 use super::themed_table::TableColors;
 use super::view_table_row::render as render_table_row;
+use crate::backend::db::get_default_db_path;
 use crate::ssh_config::SshHostInfo;
 use crate::tui::list_ssh::states::{CpuSnapshot, DiskSnapshot, MemSnapshot};
 use crate::{App, AppMode};
@@ -25,6 +26,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         .margin(1)
         .constraints([
             Constraint::Length(3), // Title / Search
+            Constraint::Length(3), // Database Path (new section)
             Constraint::Length(3), // Connection Summary
             Constraint::Min(0),    // Table
             Constraint::Length(3), // Footer
@@ -50,6 +52,18 @@ pub fn render(app: &mut App, frame: &mut Frame) {
             .alignment(Alignment::Center);
         frame.render_widget(title, chunks[0]);
     }
+
+    /*
+    Display Database Path (above connection summary)
+    */
+    let db_path = get_default_db_path();
+    let db_path_text = format!("Database Path: {}", db_path.display());
+    let db_path_paragraph = Paragraph::new(db_path_text)
+        .block(Block::default())
+        .alignment(Alignment::Left)
+        .style(Style::default().fg(Color::White));
+
+    frame.render_widget(db_path_paragraph, chunks[1]);
 
     /*
     Connection Summary
@@ -80,18 +94,12 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         .alignment(Alignment::Left)
         .wrap(Wrap { trim: true });
 
-    frame.render_widget(overview, chunks[1]);
+    frame.render_widget(overview, chunks[2]);
 
-    /*
-    Hosts & Other metrics data.
-    */
     // Prefetch CPU, Memory and Disk snapshot maps safely
     let cpu_map = block_on(app.cpu_states.snapshot_map());
     let mem_map = block_on(app.mem_states.snapshot_map());
     let disk_map = block_on(app.disk_states.snapshot_map());
-    log::debug!("📊 CPU Snapshot Map: {:?}", cpu_map);
-    log::debug!("🧠 Mem Snapshot Map: {:?}", mem_map);
-    log::debug!("💽 Disk Snapshot Map: {:?}", disk_map);
 
     let mut host_entries: Vec<HostEntry> = hosts
         .iter()
@@ -120,7 +128,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     /*
     Table
     */
-    let grid_area = chunks[2];
+    let grid_area = chunks[3];
     app.table_height = grid_area.height.saturating_sub(3) as usize;
 
     let visible_rows = grid_area.height.max(1) as usize;
@@ -189,5 +197,5 @@ pub fn render(app: &mut App, frame: &mut Frame) {
                 .border_style(Style::default().fg(colors.footer_border_color)),
         );
 
-    frame.render_widget(footer, chunks[3]);
+    frame.render_widget(footer, chunks[4]);
 }

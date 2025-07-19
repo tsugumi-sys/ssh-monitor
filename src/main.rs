@@ -15,6 +15,7 @@ use crate::tui::list_ssh::states::ListSshJobKind;
 use crate::tui::states_update::{StatesJobExecutor, StatesJobGroup};
 use std::{sync::Arc, time::Duration};
 use tokio::sync::Mutex;
+use tui::host_details::{handle_key as handle_details_key, render as render_details};
 use tui::list_ssh::{
     handle_key as handle_list_key, render as render_list,
     states::{CpuStates, DiskStates, MemStates},
@@ -34,6 +35,7 @@ async fn main() -> color_eyre::Result<()> {
 pub enum AppMode {
     List,
     Search,
+    Details,
 }
 
 #[derive(Debug)]
@@ -132,6 +134,7 @@ impl App {
     fn draw(&mut self, frame: &mut Frame) {
         match self.mode {
             AppMode::List | AppMode::Search => render_list(self, frame),
+            AppMode::Details => render_details(self, frame),
         }
     }
 
@@ -164,6 +167,11 @@ impl App {
                     self.mode = AppMode::Search;
                     self.search_query.clear();
                 }
+                KeyCode::Enter => {
+                    if self.selected_id.is_some() {
+                        self.mode = AppMode::Details;
+                    }
+                }
                 KeyCode::Char('j') | KeyCode::Down => {
                     self.vertical_scroll = self.vertical_scroll.saturating_add(1);
                     handle_list_key(self, key);
@@ -194,6 +202,7 @@ impl App {
 
                 _ => {}
             },
+            AppMode::Details => handle_details_key(self, key),
         }
     }
 

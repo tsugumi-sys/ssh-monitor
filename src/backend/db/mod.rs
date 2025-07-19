@@ -6,7 +6,7 @@ pub mod disk;
 pub mod gpu;
 pub mod mem;
 
-fn get_default_db_path() -> PathBuf {
+pub fn get_default_db_path() -> PathBuf {
     let proj_dirs = ProjectDirs::from("com", "tsugumi-sys", "SshMonitor")
         .expect("❌ Failed to determine data directory");
     let data_dir = proj_dirs.data_dir();
@@ -16,7 +16,6 @@ fn get_default_db_path() -> PathBuf {
 
 pub fn init_db_connection() -> Connection {
     let db_path = get_default_db_path();
-    println!("📂 Using database at: {}", db_path.display());
 
     let conn = Connection::open(&db_path).expect("❌ Failed to open sqlite db");
 

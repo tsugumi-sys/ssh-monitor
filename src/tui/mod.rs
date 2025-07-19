@@ -1,3 +1,4 @@
+pub mod host_details;
 pub mod list_ssh;
 pub mod states_update;
 
