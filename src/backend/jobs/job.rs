@@ -1,5 +1,6 @@
 use super::cpu::CPU_COMMAND;
 use super::disk::DISK_COMMAND;
+use super::gpu::GPU_COMMAND;
 use super::mem::MEM_COMMAND;
 use crate::ssh_config::SshHostInfo;
 use anyhow::Result;
@@ -20,6 +21,7 @@ pub enum JobKind {
     Cpu,
     Mem,
     Disk,
+    Gpu,
 }
 
 impl JobKind {
@@ -28,6 +30,7 @@ impl JobKind {
             JobKind::Cpu => "cpu",
             JobKind::Mem => "mem",
             JobKind::Disk => "disk",
+            JobKind::Gpu => "gpu",
         }
     }
 
@@ -40,6 +43,7 @@ impl JobKind {
             JobKind::Cpu => CPU_COMMAND.to_string(),
             JobKind::Mem => MEM_COMMAND.to_string(),
             JobKind::Disk => DISK_COMMAND.to_string(),
+            JobKind::Gpu => GPU_COMMAND.to_string(),
         }
     }
 
@@ -48,6 +52,7 @@ impl JobKind {
             JobKind::Cpu => crate::backend::jobs::cpu::parse_cpu(output),
             JobKind::Mem => crate::backend::jobs::mem::parse_mem(output),
             JobKind::Disk => crate::backend::jobs::disk::parse_disk(output),
+            JobKind::Gpu => crate::backend::jobs::gpu::parse_gpu(output),
         }
     }
 
@@ -112,6 +117,30 @@ impl JobKind {
                         used_percent: info.used_percent,
                     };
                     store_disk_result(conn, &insert).await?;
+                }
+
+                Ok(())
+            }
+            JobKind::Gpu => {
+                use crate::backend::db::gpu::commands::{GpuResultInsert, store_gpu_result};
+                use crate::backend::jobs::gpu::GpuInfo;
+
+                let gpu_infos = result
+                    .value
+                    .downcast_ref::<Vec<GpuInfo>>()
+                    .ok_or_else(|| anyhow::anyhow!("Expected Vec<GpuInfo> for JobKind::Gpu"))?;
+
+                for info in gpu_infos {
+                    let insert = GpuResultInsert {
+                        host_id: host_id.to_string(),
+                        gpu_index: info.index,
+                        name: info.name.clone(),
+                        memory_total_mb: info.memory_total_mb,
+                        memory_used_mb: info.memory_used_mb,
+                        temperature_c: info.temperature_c,
+                        raw_output: info.raw_output.clone(),
+                    };
+                    store_gpu_result(conn, &insert).await?;
                 }
 
                 Ok(())

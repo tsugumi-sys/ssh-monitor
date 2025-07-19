@@ -3,6 +3,7 @@ use rusqlite::Connection;
 use std::path::PathBuf;
 pub mod cpu;
 pub mod disk;
+pub mod gpu;
 pub mod mem;
 
 fn get_default_db_path() -> PathBuf {
@@ -84,6 +85,24 @@ pub fn init_db_connection() -> Connection {
 
     conn.execute(
         r#"
+        CREATE TABLE IF NOT EXISTS gpu_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            host_id TEXT NOT NULL,
+            gpu_index INTEGER NOT NULL,
+            name TEXT,
+            memory_total_mb INTEGER,
+            memory_used_mb INTEGER,
+            temperature_c REAL,
+            raw_output TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+        "#,
+        [],
+    )
+    .expect("❌ Failed to create gpu_results table");
+
+    conn.execute(
+        r#"
         DELETE FROM job_results
         WHERE timestamp < datetime('now', '-1 hour')
         "#,
@@ -91,7 +110,7 @@ pub fn init_db_connection() -> Connection {
     )
     .expect("❌ Failed to delete old job_results");
 
-    for table in ["cpu_results", "mem_results", "disk_results"] {
+    for table in ["cpu_results", "mem_results", "disk_results", "gpu_results"] {
         conn.execute(
             &format!(
                 "DELETE FROM {} WHERE timestamp < datetime('now', '-1 hour')",

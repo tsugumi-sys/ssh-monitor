@@ -106,7 +106,7 @@ impl App {
                     name: host_id.clone(),
                     interval: std::time::Duration::from_secs(1),
                     host: host.clone(),
-                    jobs: vec![JobKind::Cpu, JobKind::Mem, JobKind::Disk],
+                    jobs: vec![JobKind::Cpu, JobKind::Mem, JobKind::Disk, JobKind::Gpu],
                 };
 
                 executor.register_group(group).await;
@@ -215,7 +215,7 @@ impl App {
                 name: host_id.clone(),
                 interval: std::time::Duration::from_secs(60),
                 host: host.clone(),
-                jobs: vec![JobKind::Cpu, JobKind::Mem, JobKind::Disk],
+                jobs: vec![JobKind::Cpu, JobKind::Mem, JobKind::Disk, JobKind::Gpu],
             };
 
             executor.register_group(group).await;

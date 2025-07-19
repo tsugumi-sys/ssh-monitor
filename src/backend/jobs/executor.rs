@@ -161,6 +161,7 @@ async fn test_job_executor() {
     use crate::backend::jobs::cpu::CpuInfo;
     use crate::backend::jobs::disk::DiskInfo;
     use crate::backend::jobs::executor::JobGroupExecutor;
+    use crate::backend::jobs::gpu::GpuInfo;
     use crate::backend::jobs::job::{JobGroup, JobKind};
     use crate::backend::jobs::mem::MemInfo;
     use crate::ssh_config::SshHostInfo;
@@ -185,7 +186,7 @@ async fn test_job_executor() {
         name: "test".to_string(),
         interval: Duration::from_secs(60),
         host,
-        jobs: vec![JobKind::Cpu, JobKind::Mem, JobKind::Disk],
+        jobs: vec![JobKind::Cpu, JobKind::Mem, JobKind::Disk, JobKind::Gpu],
     };
 
     let executor = JobGroupExecutor::new(db_conn.clone());
@@ -213,6 +214,13 @@ async fn test_job_executor() {
             "disk" => {
                 if let Some(disk_info) = r.value.downcast_ref::<Vec<DiskInfo>>() {
                     println!("✅ {} => {:?}", r.job_name, disk_info);
+                } else {
+                    println!("✅ {} => (failed to downcast)", r.job_name);
+                }
+            }
+            "gpu" => {
+                if let Some(gpu_info) = r.value.downcast_ref::<Vec<GpuInfo>>() {
+                    println!("✅ {} => {:?}", r.job_name, gpu_info);
                 } else {
                     println!("✅ {} => (failed to downcast)", r.job_name);
                 }
