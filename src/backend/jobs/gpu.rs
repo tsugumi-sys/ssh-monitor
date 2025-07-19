@@ -76,16 +76,12 @@ pub fn parse_gpu(output: &str) -> Result<Option<JobResult>> {
 mod tests {
     use super::*;
 
-    // Test for Linux GPU parsing
     #[test]
     fn test_parse_gpu_linux() -> Result<()> {
-        // Arrange
         let input = "GeForce GTX 1080 Ti, 11178, 4523, 70\nTesla K80, 11441, 0, 35";
 
-        // Act
         let result = parse_gpu(input)?;
 
-        // Assert
         assert!(result.is_some());
         let job_result = result.unwrap();
         let infos: &Vec<GpuInfo> = job_result.value.downcast_ref::<Vec<GpuInfo>>().unwrap();
@@ -106,10 +102,8 @@ mod tests {
         Ok(())
     }
 
-    // Test for macOS GPU parsing
     #[test]
     fn test_parse_gpu_macos() -> Result<()> {
-        // Arrange
         let macos_input = r#"
 Graphics/Displays:
 
@@ -132,10 +126,8 @@ Graphics/Displays:
           Connection Type: Internal
 "#;
 
-        // Act
         let result = parse_gpu(macos_input)?;
 
-        // Assert
         assert!(result.is_some());
         let job_result = result.unwrap();
         let infos: &Vec<GpuInfo> = job_result.value.downcast_ref::<Vec<GpuInfo>>().unwrap();
