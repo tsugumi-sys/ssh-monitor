@@ -13,12 +13,16 @@ pub struct DiskResultRow {
 pub async fn fetch_latest_disk_all(conn: &Arc<Mutex<Connection>>) -> Result<Vec<DiskResultRow>> {
     let conn = conn.lock().await;
     let mut stmt = conn.prepare(
-        "SELECT d.host_id, SUM(d.total_mb) as total_mb, SUM(d.used_mb) as used_mb \
-         FROM disk_results d \
-         JOIN (SELECT host_id, MAX(timestamp) AS max_ts FROM disk_results GROUP BY host_id) t \
-           ON d.host_id = t.host_id AND d.timestamp = t.max_ts \
-         GROUP BY d.host_id",
+        "SELECT 
+            d.host_id,
+            SUM(CASE WHEN d.mount_point = '/' THEN d.total_mb + d.used_mb + d.available_mb ELSE 0 END) AS total_capacity,
+            SUM(d.used_mb) AS total_usage
+        FROM disk_results d
+        JOIN (SELECT host_id, MAX(timestamp) AS max_ts FROM disk_results GROUP BY host_id) t
+          ON d.host_id = t.host_id AND d.timestamp = t.max_ts
+        GROUP BY d.host_id",
     )?;
+
     let rows = stmt.query_map([], |row| {
         Ok(DiskResultRow {
             host_id: row.get::<_, String>(0)?,
