@@ -10,8 +10,10 @@ use tokio::sync::{Mutex, RwLock};
 
 #[derive(Debug, Clone, Default)]
 pub struct CpuSnapshot {
+    pub model_name: String,
     pub core_count: u32,
     pub usage_percent: f32,
+    pub per_core: Vec<f32>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -162,8 +164,10 @@ impl CpuStates {
             map.insert(
                 row.host_id,
                 CpuSnapshot {
+                    model_name: row.model_name,
                     core_count: row.core_count,
                     usage_percent: row.usage_percent,
+                    per_core: row.per_core,
                 },
             );
         }
