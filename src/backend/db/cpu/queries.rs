@@ -1,5 +1,6 @@
 use anyhow::Result;
 use rusqlite::Connection;
+use serde_json;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -8,6 +9,15 @@ pub struct CpuResultRow {
     pub host_id: String,
     pub core_count: u32,
     pub usage_percent: f32,
+}
+
+#[derive(Debug, Clone)]
+pub struct CpuDetailRow {
+    pub host_id: String,
+    pub model_name: String,
+    pub core_count: u32,
+    pub usage_percent: f32,
+    pub per_core: Vec<f32>,
 }
 
 pub async fn fetch_latest_cpu_all(conn: &Arc<Mutex<Connection>>) -> Result<Vec<CpuResultRow>> {
@@ -30,4 +40,32 @@ pub async fn fetch_latest_cpu_all(conn: &Arc<Mutex<Connection>>) -> Result<Vec<C
         results.push(r?);
     }
     Ok(results)
+}
+
+pub async fn fetch_latest_cpu_by_host(
+    conn: &Arc<Mutex<Connection>>,
+    host_id: &str,
+) -> Result<Option<CpuDetailRow>> {
+    let conn = conn.lock().await;
+    let mut stmt = conn.prepare(
+        "SELECT model_name, core_count, usage_percent, per_core_json \
+         FROM cpu_results \
+         WHERE host_id = ?1 \
+         ORDER BY timestamp DESC \
+         LIMIT 1",
+    )?;
+    let mut rows = stmt.query([host_id])?;
+    if let Some(row) = rows.next()? {
+        let per_core_json: String = row.get(3)?;
+        let per_core: Vec<f32> = serde_json::from_str(&per_core_json).unwrap_or_default();
+        Ok(Some(CpuDetailRow {
+            host_id: host_id.to_string(),
+            model_name: row.get::<_, String>(0)?,
+            core_count: row.get::<_, i64>(1)? as u32,
+            usage_percent: row.get::<_, f64>(2)? as f32,
+            per_core,
+        }))
+    } else {
+        Ok(None)
+    }
 }
