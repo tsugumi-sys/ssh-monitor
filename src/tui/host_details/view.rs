@@ -1,7 +1,6 @@
 use ratatui::prelude::*;
 use ratatui::widgets::*;
 
-use crate::backend::db::cpu::queries::fetch_latest_cpu_by_host;
 use futures::executor::block_on;
 
 use crate::App;
@@ -16,7 +15,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         return;
     };
 
-    let cpu_detail = block_on(fetch_latest_cpu_by_host(&app.db, host_id)).unwrap_or(None);
+    let cpu_detail = block_on(app.details_states.cpu.get(host_id));
 
     let block = Block::default().title("CPU").borders(Borders::ALL);
     let inner_area = block.inner(area);
