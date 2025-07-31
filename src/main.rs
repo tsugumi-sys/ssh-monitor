@@ -15,6 +15,7 @@ use crate::tui::list_ssh::states::ListSshJobKind;
 use crate::tui::states_update::{StatesJobExecutor, StatesJobGroup};
 use std::{sync::Arc, time::Duration};
 use tokio::sync::Mutex;
+use tui::host_details::states::{DetailsJobKind, HostDetailsState};
 use tui::host_details::{handle_key as handle_details_key, render as render_details};
 use tui::list_ssh::{
     handle_key as handle_list_key, render as render_list,
@@ -48,6 +49,7 @@ pub struct App {
     pub cpu_states: Arc<CpuStates>,
     pub mem_states: Arc<MemStates>,
     pub disk_states: Arc<DiskStates>,
+    pub details_states: HostDetailsState,
     pub table_state: TableState,
     pub table_height: usize,
     pub selected_id: Option<String>,
@@ -76,6 +78,7 @@ impl App {
         let cpu_states = Arc::new(CpuStates::new());
         let mem_states = Arc::new(MemStates::new());
         let disk_states = Arc::new(DiskStates::new());
+        let details_states = HostDetailsState::new();
         Self {
             running: false,
             event_stream: EventStream::new(),
@@ -85,6 +88,7 @@ impl App {
             cpu_states,
             mem_states,
             disk_states,
+            details_states,
             // Table
             table_height: 0,
             table_state: TableState::default().with_selected(Some(0)),
@@ -247,5 +251,15 @@ impl App {
 
         list_executor.register_group(list_job_group).await;
         list_executor.run_all().await;
+
+        let details_executor = StatesJobExecutor::new(self.db.clone());
+        let details_job_group = StatesJobGroup {
+            name: "details_view".to_string(),
+            interval: Duration::from_secs(5),
+            jobs: vec![DetailsJobKind::Cpu(self.details_states.cpu.clone())],
+        };
+
+        details_executor.register_group(details_job_group).await;
+        details_executor.run_all().await;
     }
 }
