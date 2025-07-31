@@ -256,7 +256,10 @@ impl App {
         let details_job_group = StatesJobGroup {
             name: "details_view".to_string(),
             interval: Duration::from_secs(5),
-            jobs: vec![DetailsJobKind::Cpu(self.details_states.cpu.clone())],
+            jobs: vec![
+                DetailsJobKind::Cpu(self.details_states.cpu.clone()),
+                DetailsJobKind::Mem(self.details_states.mem.clone()),
+            ],
         };
 
         details_executor.register_group(details_job_group).await;
