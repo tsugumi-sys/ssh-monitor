@@ -36,9 +36,11 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     frame.render_widget(info_block, chunks[0]);
 
     if let Some(info) = host_info {
-        let lines = [format!("Name: {}", info.name),
+        let lines = [
+            format!("Name: {}", info.name),
             format!("User: {}", info.user),
-            format!("Host: {}:{}", info.ip, info.port)];
+            format!("Host: {}:{}", info.ip, info.port),
+        ];
         let paragraph = Paragraph::new(lines.join("\n"))
             .style(Style::default())
             .alignment(Alignment::Left);
@@ -91,10 +93,12 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     frame.render_widget(mem_block, chunks[2]);
 
     if let Some(mem) = mem_detail {
-        let lines = [format!("Total: {:.1}GB", mem.total_mb as f64 / 1024.0),
+        let lines = [
+            format!("Total: {:.1}GB", mem.total_mb as f64 / 1024.0),
             render_bar("Use", mem.used_percent),
             format!("Used: {:.1}GB", mem.used_mb as f64 / 1024.0),
-            format!("Free: {:.1}GB", mem.free_mb as f64 / 1024.0)];
+            format!("Free: {:.1}GB", mem.free_mb as f64 / 1024.0),
+        ];
 
         let paragraph = Paragraph::new(lines.join("\n"))
             .style(Style::default())
