@@ -141,12 +141,10 @@ impl<'a> TimelineChart<'a> {
                                     format!("{}d", days_ago)
                                 }
                             }
+                        } else if timestamp.len() >= 5 {
+                            timestamp[timestamp.len() - 5..].to_string()
                         } else {
-                            if timestamp.len() >= 5 {
-                                timestamp[timestamp.len() - 5..].to_string()
-                            } else {
-                                format!("{}", idx)
-                            }
+                            format!("{}", idx)
                         }
                     } else {
                         format!("{}", idx)
