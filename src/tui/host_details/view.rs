@@ -41,8 +41,8 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     if let Some(info) = host_info {
         let lines = [
             format!("Name: {}", info.name),
-            format!("User: {}", info.user),
-            format!("Host: {}:{}", info.ip, info.port),
+            format!("User: {}@{}:{}", info.user, info.ip, info.port),
+            format!("Identity: {}", info.identity_file),
         ];
         let paragraph = Paragraph::new(lines.join("\n"))
             .style(Style::default())
