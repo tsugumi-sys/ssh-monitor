@@ -63,6 +63,9 @@ ssh-add -l
 
 ### 2. Installation
 
+```bash
+curl -sSL https://raw.githubusercontent.com/tsugumi-sys/ssh-monitor/main/install.sh | bash
+```
 
 
 ## Development
