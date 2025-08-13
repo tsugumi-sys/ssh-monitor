@@ -26,8 +26,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         .margin(1)
         .constraints([
             Constraint::Length(3), // Title / Search
-            Constraint::Length(3), // Database Path (new section)
-            Constraint::Length(3), // Connection Summary
+            Constraint::Length(3), // Database Path
             Constraint::Min(0),    // Table
             Constraint::Length(3), // Footer
         ])
@@ -65,36 +64,9 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 
     frame.render_widget(db_path_paragraph, chunks[1]);
 
-    /*
-    Connection Summary
-    */
+    // Get hosts
     let hosts_guard = block_on(app.ssh_hosts.lock());
     let hosts = &*hosts_guard;
-
-    let connected = 0;
-    let loading = 0;
-    let failed = 0;
-
-    let overview_lines = vec![Line::from(vec![
-        Span::styled("● ", Style::default().fg(Color::Green)),
-        Span::raw(format!("Connected: {}  ", connected)),
-        Span::styled("● ", Style::default().fg(Color::Yellow)),
-        Span::raw(format!("Loading: {}  ", loading)),
-        Span::styled("● ", Style::default().fg(Color::Red)),
-        Span::raw(format!("Failed: {}", failed)),
-    ])];
-
-    let overview_block = Block::default()
-        .borders(Borders::ALL)
-        .title("Connection Summary")
-        .border_style(Style::default().fg(Color::White));
-
-    let overview = Paragraph::new(overview_lines)
-        .block(overview_block)
-        .alignment(Alignment::Left)
-        .wrap(Wrap { trim: true });
-
-    frame.render_widget(overview, chunks[2]);
 
     // Prefetch CPU, Memory and Disk snapshot maps safely
     let cpu_map = block_on(app.cpu_states.snapshot_map());
@@ -128,7 +100,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     /*
     Table
     */
-    let grid_area = chunks[3];
+    let grid_area = chunks[2];
     app.table_height = grid_area.height.saturating_sub(3) as usize;
 
     let visible_rows = grid_area.height.max(1) as usize;
@@ -197,5 +169,5 @@ pub fn render(app: &mut App, frame: &mut Frame) {
                 .border_style(Style::default().fg(colors.footer_border_color)),
         );
 
-    frame.render_widget(footer, chunks[4]);
+    frame.render_widget(footer, chunks[3]);
 }
