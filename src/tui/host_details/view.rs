@@ -199,8 +199,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
                 let top_volumes: Vec<_> = sorted_volumes.into_iter().take(5).collect();
 
                 // Create table with border and title
-                let table_block = Block::default()
-                    .title("Volume Details (Top 5 by Usage)");
+                let table_block = Block::default().title("Volume Details (Top 5 by Usage)");
                 let table_inner = table_block.inner(disk_chunks[2]);
                 frame.render_widget(table_block, disk_chunks[2]);
 
