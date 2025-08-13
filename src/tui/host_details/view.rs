@@ -200,9 +200,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 
                 // Create table with border and title
                 let table_block = Block::default()
-                    .title("Volume Details (Top 5 by Usage)")
-                    .borders(Borders::ALL)
-                    .border_style(Style::default().fg(Color::Gray));
+                    .title("Volume Details (Top 5 by Usage)");
                 let table_inner = table_block.inner(disk_chunks[2]);
                 frame.render_widget(table_block, disk_chunks[2]);
 
