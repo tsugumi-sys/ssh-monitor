@@ -13,7 +13,7 @@ use ssh_config::{SharedSshHosts, SshHostInfo, load_ssh_configs};
 mod tui;
 use crate::tui::list_ssh::states::ListSshJobKind;
 use crate::tui::states_update::{StatesJobExecutor, StatesJobGroup};
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use tui::host_details::states::{DetailsJobKind, HostDetailsState};
 use tui::host_details::{handle_key as handle_details_key, render as render_details};
@@ -26,8 +26,30 @@ use tui::list_ssh::{
 async fn main() -> color_eyre::Result<()> {
     env_logger::init();
     color_eyre::install()?;
+
+    // Validate SSH config before starting the TUI
+    let ssh_hosts = match load_ssh_configs() {
+        Ok(hosts) if !hosts.is_empty() => hosts,
+        Ok(_) => {
+            eprintln!("❌ No SSH hosts found in your SSH config.");
+            eprintln!("Please add some hosts to ~/.ssh/config and try again.");
+            eprintln!();
+            eprintln!("Example SSH config entry:");
+            eprintln!("Host myserver");
+            eprintln!("    HostName 192.168.1.100");
+            eprintln!("    User username");
+            eprintln!("    Port 22");
+            std::process::exit(1);
+        }
+        Err(err) => {
+            eprintln!("❌ Error reading SSH config: {}", err);
+            eprintln!("Please check that ~/.ssh/config exists and is properly formatted.");
+            std::process::exit(1);
+        }
+    };
+
     let terminal = ratatui::init();
-    let result = App::new().run(terminal).await;
+    let result = App::new_with_hosts(ssh_hosts).run(terminal).await;
     ratatui::restore();
     result
 }
@@ -68,6 +90,10 @@ impl Default for App {
 impl App {
     pub fn new() -> Self {
         let ssh_hosts = load_ssh_configs().unwrap_or_default(); // now a HashMap
+        Self::new_with_hosts(ssh_hosts)
+    }
+
+    pub fn new_with_hosts(ssh_hosts: HashMap<String, SshHostInfo>) -> Self {
         let mut visible_hosts: Vec<(String, SshHostInfo)> = ssh_hosts
             .iter()
             .map(|(k, v)| (k.clone(), v.clone()))
