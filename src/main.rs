@@ -259,6 +259,7 @@ impl App {
             jobs: vec![
                 DetailsJobKind::Cpu(self.details_states.cpu.clone()),
                 DetailsJobKind::Mem(self.details_states.mem.clone()),
+                DetailsJobKind::Disk(self.details_states.disk.clone()),
             ],
         };
 
