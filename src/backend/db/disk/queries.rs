@@ -12,6 +12,7 @@ pub struct DiskResultRow {
 
 #[derive(Debug, Clone)]
 pub struct DiskVolumeRow {
+    #[allow(dead_code)]
     pub host_id: String,
     pub mount_point: String,
     pub total_mb: u64,

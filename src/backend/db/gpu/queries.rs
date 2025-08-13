@@ -11,6 +11,7 @@ pub struct GpuResultRow {
     pub memory_total_mb: Option<u64>,
     pub memory_used_mb: Option<u64>,
     pub temperature_c: Option<f32>,
+    #[allow(dead_code)]
     pub raw_output: Option<String>,
 }
 
