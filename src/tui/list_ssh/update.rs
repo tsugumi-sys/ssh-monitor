@@ -7,14 +7,6 @@ pub fn handle_key(app: &mut App, key: crossterm::event::KeyEvent) {
         return;
     }
 
-    let current_index = app
-        .selected_id
-        .as_ref()
-        .and_then(|id| app.visible_hosts.iter().position(|(key, _)| key == id))
-        .unwrap_or(0);
-
-    let next_index = current_index;
-
     match key.code {
         KeyCode::Char('j') | KeyCode::Down => {
             let new_index = match app.table_state.selected() {
@@ -38,17 +30,6 @@ pub fn handle_key(app: &mut App, key: crossterm::event::KeyEvent) {
             app.running = false;
         }
         _ => {}
-    }
-
-    if let Some((id, _)) = app.visible_hosts.get(next_index) {
-        app.selected_id = Some(id.clone());
-
-        let visible_rows = app.table_height.max(1);
-        if next_index < app.vertical_scroll {
-            app.vertical_scroll = next_index;
-        } else if next_index >= app.vertical_scroll + visible_rows {
-            app.vertical_scroll = next_index + 1 - visible_rows;
-        }
     }
 }
 

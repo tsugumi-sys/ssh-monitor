@@ -186,6 +186,10 @@ impl App {
                 }
                 KeyCode::Enter => {
                     self.mode = AppMode::List;
+                    if !self.visible_hosts.is_empty() {
+                        self.table_state.select(Some(0));
+                        self.selected_id = Some(self.visible_hosts[0].0.clone());
+                    }
                 }
                 KeyCode::Backspace => {
                     self.search_query.pop();
