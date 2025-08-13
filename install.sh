@@ -30,4 +30,4 @@ sudo mv ssh-monitor /usr/local/bin/
 echo "Cleaning up..."
 rm "$FILE"
 
-echo "✅ Installation complete! Run 'ssh-monitor --help' to see usage."
+echo "✅ Installation complete! Run 'ssh-monitor' to see usage."

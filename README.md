@@ -67,6 +67,11 @@ ssh-add -l
 curl -sSL https://raw.githubusercontent.com/tsugumi-sys/ssh-monitor/main/install.sh | bash
 ```
 
+### 3. Run command
+
+```sh
+ssh-monitor
+```
 
 ## Development
 
