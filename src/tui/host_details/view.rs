@@ -515,6 +515,7 @@ Memory: N/A",
 fn render_bar(label: &str, percent: f32) -> String {
     let width = 8;
     let filled = (percent / 100.0 * width as f32).round() as usize;
+    let filled = filled.min(width); // Prevent overflow by clamping to width
     let empty = width - filled;
     format!(
         "{:>3} [{}{}] {:>3.0}%",
@@ -528,6 +529,7 @@ fn render_bar(label: &str, percent: f32) -> String {
 fn render_wide_bar(label: &str, percent: f32) -> String {
     let width = 20; // Wider bar for main usage displays
     let filled = (percent / 100.0 * width as f32).round() as usize;
+    let filled = filled.min(width); // Prevent overflow by clamping to width
     let empty = width - filled;
     format!(
         "{:>3} [{}{}] {:>4.1}%",
