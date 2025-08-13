@@ -18,6 +18,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     let cpu_detail = block_on(app.details_states.cpu.get(host_id));
     let mem_detail = block_on(app.details_states.mem.get(host_id));
     let disk_detail = block_on(app.details_states.disk.get(host_id));
+    let gpu_detail = block_on(app.details_states.gpu.get(host_id));
     let host_info = {
         let hosts = block_on(app.ssh_hosts.lock());
         hosts.get(host_id).cloned()
@@ -90,9 +91,15 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         frame.render_widget(paragraph, cpu_inner);
     }
 
+    // Split the second row into Memory and Disk side by side
+    let mem_disk_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(chunks[2]);
+
     let mem_block = Block::default().title("Memory").borders(Borders::ALL);
-    let mem_inner = mem_block.inner(chunks[2]);
-    frame.render_widget(mem_block, chunks[2]);
+    let mem_inner = mem_block.inner(mem_disk_chunks[0]);
+    frame.render_widget(mem_block, mem_disk_chunks[0]);
 
     if let Some(mem) = mem_detail {
         let lines = [
@@ -114,8 +121,8 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     }
 
     let disk_block = Block::default().title("Disk").borders(Borders::ALL);
-    let disk_inner = disk_block.inner(chunks[3]);
-    frame.render_widget(disk_block, chunks[3]);
+    let disk_inner = disk_block.inner(mem_disk_chunks[1]);
+    frame.render_widget(disk_block, mem_disk_chunks[1]);
 
     if let Some(disk) = disk_detail {
         // Calculate comprehensive overview metrics
@@ -261,6 +268,61 @@ pub fn render(app: &mut App, frame: &mut Frame) {
             .block(Block::default())
             .alignment(Alignment::Center);
         frame.render_widget(paragraph, disk_inner);
+    }
+
+    let gpu_block = Block::default().title("GPU").borders(Borders::ALL);
+    let gpu_inner = gpu_block.inner(chunks[3]);
+    frame.render_widget(gpu_block, chunks[3]);
+
+    if let Some(gpus) = gpu_detail {
+        if !gpus.is_empty() {
+            let mut lines = vec![format!("GPU Count: {}", gpus.len())];
+
+            for gpu in &gpus {
+                lines.push(format!("┌─ GPU {}: {}", gpu.index, gpu.name));
+
+                if let (Some(total_mb), Some(used_mb)) = (gpu.memory_total_mb, gpu.memory_used_mb) {
+                    let usage_percent = if total_mb > 0 {
+                        (used_mb as f32 / total_mb as f32) * 100.0
+                    } else {
+                        0.0
+                    };
+                    lines.push(format!("│  Memory: {:.1}GB", total_mb as f64 / 1024.0));
+                    lines.push(render_bar("│  Use", usage_percent));
+                    lines.push(format!("│  Used: {:.1}GB", used_mb as f64 / 1024.0));
+                } else {
+                    lines.push("│  Memory: N/A".to_string());
+                }
+
+                if let Some(temp) = gpu.temperature_c {
+                    lines.push(format!("│  Temp: {:.1}°C", temp));
+                } else {
+                    lines.push("│  Temp: N/A".to_string());
+                }
+
+                if gpu.index < gpus.len() as u32 - 1 {
+                    lines.push("│".to_string());
+                }
+            }
+
+            let paragraph = Paragraph::new(lines.join(
+                "
+",
+            ))
+            .style(Style::default())
+            .alignment(Alignment::Left);
+            frame.render_widget(paragraph, gpu_inner);
+        } else {
+            let paragraph = Paragraph::new("No GPUs detected")
+                .block(Block::default())
+                .alignment(Alignment::Center);
+            frame.render_widget(paragraph, gpu_inner);
+        }
+    } else {
+        let paragraph = Paragraph::new("No GPU data")
+            .block(Block::default())
+            .alignment(Alignment::Center);
+        frame.render_widget(paragraph, gpu_inner);
     }
 }
 

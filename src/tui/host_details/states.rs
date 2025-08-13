@@ -31,6 +31,15 @@ pub struct DiskDetailSnapshot {
     pub used_percent: f32,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct GpuDetailSnapshot {
+    pub index: u32,
+    pub name: String,
+    pub memory_total_mb: Option<u64>,
+    pub memory_used_mb: Option<u64>,
+    pub temperature_c: Option<f32>,
+}
+
 #[derive(Debug, Clone)]
 pub struct DiskVolumeSnapshot {
     pub mount_point: String,
@@ -53,6 +62,11 @@ pub struct MemDetailStates {
 #[derive(Debug, Clone)]
 pub struct DiskDetailStates {
     data: Arc<RwLock<HashMap<String, DiskDetailSnapshot>>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GpuDetailStates {
+    data: Arc<RwLock<HashMap<String, Vec<GpuDetailSnapshot>>>>,
 }
 
 impl Default for CpuDetailStates {
@@ -139,6 +153,11 @@ impl Default for DiskDetailStates {
         Self::new()
     }
 }
+impl Default for GpuDetailStates {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl DiskDetailStates {
     pub fn new() -> Self {
@@ -196,12 +215,55 @@ impl DiskDetailStates {
         self.data.read().await.clone()
     }
 }
+impl GpuDetailStates {
+    pub fn new() -> Self {
+        Self {
+            data: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    pub async fn get(&self, host_id: &str) -> Option<Vec<GpuDetailSnapshot>> {
+        self.data.read().await.get(host_id).cloned()
+    }
+
+    pub async fn update_from_db(&self, conn: &Arc<Mutex<Connection>>) -> Result<()> {
+        let rows = crate::backend::db::gpu::queries::fetch_latest_gpu_all(conn).await?;
+        let mut map = self.data.write().await;
+        map.clear();
+
+        for row in rows {
+            let gpu_snapshot = GpuDetailSnapshot {
+                index: row.gpu_index,
+                name: row.name,
+                memory_total_mb: row.memory_total_mb,
+                memory_used_mb: row.memory_used_mb,
+                temperature_c: row.temperature_c,
+            };
+
+            map.entry(row.host_id)
+                .or_insert_with(Vec::new)
+                .push(gpu_snapshot);
+        }
+
+        // Sort GPUs by index for each host
+        for gpu_list in map.values_mut() {
+            gpu_list.sort_by_key(|gpu| gpu.index);
+        }
+
+        Ok(())
+    }
+
+    pub async fn snapshot_map(&self) -> HashMap<String, Vec<GpuDetailSnapshot>> {
+        self.data.read().await.clone()
+    }
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct HostDetailsState {
     pub cpu: Arc<CpuDetailStates>,
     pub mem: Arc<MemDetailStates>,
     pub disk: Arc<DiskDetailStates>,
+    pub gpu: Arc<GpuDetailStates>,
 }
 
 impl HostDetailsState {
@@ -210,6 +272,7 @@ impl HostDetailsState {
             cpu: Arc::new(CpuDetailStates::new()),
             mem: Arc::new(MemDetailStates::new()),
             disk: Arc::new(DiskDetailStates::new()),
+            gpu: Arc::new(GpuDetailStates::new()),
         }
     }
 }
@@ -219,6 +282,7 @@ pub enum DetailsJobKind {
     Cpu(Arc<CpuDetailStates>),
     Mem(Arc<MemDetailStates>),
     Disk(Arc<DiskDetailStates>),
+    Gpu(Arc<GpuDetailStates>),
 }
 
 #[async_trait::async_trait]
@@ -228,6 +292,7 @@ impl StateJob for DetailsJobKind {
             DetailsJobKind::Cpu(_) => "cpu_detail",
             DetailsJobKind::Mem(_) => "mem_detail",
             DetailsJobKind::Disk(_) => "disk_detail",
+            DetailsJobKind::Gpu(_) => "gpu_detail",
         }
     }
 
@@ -236,6 +301,7 @@ impl StateJob for DetailsJobKind {
             DetailsJobKind::Cpu(state) => state.update_from_db(conn).await,
             DetailsJobKind::Mem(state) => state.update_from_db(conn).await,
             DetailsJobKind::Disk(state) => state.update_from_db(conn).await,
+            DetailsJobKind::Gpu(state) => state.update_from_db(conn).await,
         }
     }
 }
