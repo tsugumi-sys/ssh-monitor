@@ -27,14 +27,16 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(4),
-            Constraint::Percentage(30),
-            Constraint::Percentage(35),
-            Constraint::Percentage(35),
+            Constraint::Length(4),      // Host info
+            Constraint::Percentage(50), // CPU & Memory row
+            Constraint::Percentage(50), // GPU & Disk row
         ])
         .split(area);
 
-    let info_block = Block::default().title("Host Info").borders(Borders::ALL);
+    let info_block = Block::default()
+        .title("Host Info")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::White));
     let info_inner = info_block.inner(chunks[0]);
     frame.render_widget(info_block, chunks[0]);
 
@@ -55,16 +57,61 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         frame.render_widget(paragraph, info_inner);
     }
 
-    let cpu_block = Block::default().title("CPU").borders(Borders::ALL);
-    let cpu_inner = cpu_block.inner(chunks[1]);
-    frame.render_widget(cpu_block, chunks[1]);
+    // Split the first row into CPU and Memory side by side
+    let cpu_mem_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(chunks[1]);
+
+    let cpu_block = Block::default()
+        .title("CPU")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::White));
+    let cpu_inner = cpu_block.inner(cpu_mem_chunks[0]);
+    frame.render_widget(cpu_block, cpu_mem_chunks[0]);
 
     if let Some(cpu) = cpu_detail {
-        // Total usage line
-        let mut lines = vec![
-            format!("Model: {}", cpu.model_name),
-            format!("Total: {:.1}%", cpu.usage_percent),
-        ];
+        // Split CPU area into gauge, spacer, cores, and info sections
+        let cpu_sections = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(3), // Gauge (model + usage)
+                Constraint::Length(1), // Spacer
+                Constraint::Length(4), // Per-core usage
+                Constraint::Min(0),    // Additional info
+            ])
+            .split(cpu_inner);
+
+        // Split gauge section for model name and usage gauge
+        let gauge_sections = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1), // Model name
+                Constraint::Length(2), // Usage gauge
+            ])
+            .split(cpu_sections[0]);
+
+        // CPU Model Name
+        let model_paragraph = Paragraph::new(format!("Model: {}", cpu.model_name))
+            .style(Style::default().fg(Color::White))
+            .alignment(Alignment::Left);
+        frame.render_widget(model_paragraph, gauge_sections[0]);
+
+        // CPU Usage Bar
+        let cpu_bar = render_wide_bar("CPU", cpu.usage_percent);
+        let cpu_paragraph = Paragraph::new(format!(
+            "Total CPU Usage
+{}",
+            cpu_bar
+        ))
+        .block(Block::default())
+        .style(Style::default())
+        .alignment(Alignment::Left);
+        frame.render_widget(cpu_paragraph, gauge_sections[1]);
+
+        // Spacer between total and per-core usage
+        let spacer = Paragraph::new("").style(Style::default());
+        frame.render_widget(spacer, cpu_sections[1]);
 
         // Per-core usage
         let core_lines: Vec<String> = cpu
@@ -74,16 +121,26 @@ pub fn render(app: &mut App, frame: &mut Frame) {
             .map(|(i, usage)| render_bar(&format!("c{}", i), *usage))
             .collect();
 
-        // Split core_lines into multiple columns (e.g., 2 or 3 per row)
         let cols = 3;
+        let mut core_display = Vec::new();
         for chunk in core_lines.chunks(cols) {
-            lines.push(chunk.join("   "));
+            core_display.push(chunk.join("   "));
         }
 
-        let paragraph = Paragraph::new(lines.join("\n"))
+        let cores_paragraph = Paragraph::new(core_display.join(
+            "
+",
+        ))
+        .block(Block::default().title("Per-Core Usage"))
+        .style(Style::default())
+        .alignment(Alignment::Left);
+        frame.render_widget(cores_paragraph, cpu_sections[2]);
+
+        // Additional CPU info area
+        let cpu_info = Paragraph::new(format!("Cores: {}", cpu.per_core.len()))
             .style(Style::default())
             .alignment(Alignment::Left);
-        frame.render_widget(paragraph, cpu_inner);
+        frame.render_widget(cpu_info, cpu_sections[3]);
     } else {
         let paragraph = Paragraph::new("No CPU data")
             .block(Block::default())
@@ -91,28 +148,60 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         frame.render_widget(paragraph, cpu_inner);
     }
 
-    // Split the second row into Memory and Disk side by side
-    let mem_disk_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-        .split(chunks[2]);
-
-    let mem_block = Block::default().title("Memory").borders(Borders::ALL);
-    let mem_inner = mem_block.inner(mem_disk_chunks[0]);
-    frame.render_widget(mem_block, mem_disk_chunks[0]);
+    let mem_block = Block::default()
+        .title("Memory")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::White));
+    let mem_inner = mem_block.inner(cpu_mem_chunks[1]);
+    frame.render_widget(mem_block, cpu_mem_chunks[1]);
 
     if let Some(mem) = mem_detail {
+        // Split Memory area into gauge and details
+        let mem_sections = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(3), // Gauge
+                Constraint::Length(3), // Sparkline
+                Constraint::Min(0),    // Details
+            ])
+            .split(mem_inner);
+
+        // Memory Bar
+        let mem_bar = render_wide_bar("Mem", mem.used_percent);
+        let mem_paragraph = Paragraph::new(format!(
+            "Memory: {:.1}GB ({:.1}%)
+{}",
+            mem.total_mb as f64 / 1024.0,
+            mem.used_percent,
+            mem_bar
+        ))
+        .block(Block::default())
+        .style(Style::default())
+        .alignment(Alignment::Left);
+        frame.render_widget(mem_paragraph, mem_sections[0]);
+
+        // Memory statistics area
+        let mem_stats = Paragraph::new(format!(
+            "Available: {:.1}GB",
+            (mem.total_mb - mem.used_mb) as f64 / 1024.0
+        ))
+        .style(Style::default())
+        .alignment(Alignment::Left);
+        frame.render_widget(mem_stats, mem_sections[1]);
+
+        // Memory Details
         let lines = [
-            format!("Total: {:.1}GB", mem.total_mb as f64 / 1024.0),
-            render_bar("Use", mem.used_percent),
             format!("Used: {:.1}GB", mem.used_mb as f64 / 1024.0),
             format!("Free: {:.1}GB", mem.free_mb as f64 / 1024.0),
         ];
 
-        let paragraph = Paragraph::new(lines.join("\n"))
-            .style(Style::default())
-            .alignment(Alignment::Left);
-        frame.render_widget(paragraph, mem_inner);
+        let details_paragraph = Paragraph::new(lines.join(
+            "
+",
+        ))
+        .style(Style::default())
+        .alignment(Alignment::Left);
+        frame.render_widget(details_paragraph, mem_sections[2]);
     } else {
         let paragraph = Paragraph::new("No Mem data")
             .block(Block::default())
@@ -120,9 +209,18 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         frame.render_widget(paragraph, mem_inner);
     }
 
-    let disk_block = Block::default().title("Disk").borders(Borders::ALL);
-    let disk_inner = disk_block.inner(mem_disk_chunks[1]);
-    frame.render_widget(disk_block, mem_disk_chunks[1]);
+    // Split the second row into GPU and Disk side by side
+    let gpu_disk_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(chunks[2]);
+
+    let disk_block = Block::default()
+        .title("Disk")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::White));
+    let disk_inner = disk_block.inner(gpu_disk_chunks[1]);
+    frame.render_widget(disk_block, gpu_disk_chunks[1]);
 
     if let Some(disk) = disk_detail {
         // Calculate comprehensive overview metrics
@@ -140,7 +238,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
                     let content = vec![
                         format!("Storage Overview ({} volumes)", volume_count),
                         format!("Total Capacity: {:.1} GB", total_gb),
-                        render_bar("Usage", disk.used_percent),
+                        render_wide_bar("Usage", disk.used_percent),
                         format!("Used: {:.1} GB  •  Free: {:.1} GB", used_gb, free_gb),
                     ];
                     (volume_count, content)
@@ -148,7 +246,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
                     // Simple overview if no volumes
                     let content = vec![
                         format!("Total: {:.1} GB", total_gb),
-                        render_bar("Usage", disk.used_percent),
+                        render_wide_bar("Usage", disk.used_percent),
                         format!("Used: {:.1} GB  •  Free: {:.1} GB", used_gb, free_gb),
                     ];
                     (0, content)
@@ -267,48 +365,123 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         frame.render_widget(paragraph, disk_inner);
     }
 
-    let gpu_block = Block::default().title("GPU").borders(Borders::ALL);
-    let gpu_inner = gpu_block.inner(chunks[3]);
-    frame.render_widget(gpu_block, chunks[3]);
+    let gpu_block = Block::default()
+        .title("GPU")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::White));
+    let gpu_inner = gpu_block.inner(gpu_disk_chunks[0]);
+    frame.render_widget(gpu_block, gpu_disk_chunks[0]);
 
     if let Some(gpus) = gpu_detail {
         if !gpus.is_empty() {
-            let mut lines = vec![format!("GPU Count: {}", gpus.len())];
+            if gpus.len() == 1 {
+                // Single GPU - use gauges for better visualization
+                let gpu = &gpus[0];
+                let gpu_sections = Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints([
+                        Constraint::Length(3), // Memory Gauge
+                        Constraint::Length(3), // Temperature Gauge
+                        Constraint::Min(0),    // Info
+                    ])
+                    .split(gpu_inner);
 
-            for gpu in &gpus {
-                lines.push(format!("┌─ GPU {}: {}", gpu.index, gpu.name));
-
+                // GPU Memory Bar
                 if let (Some(total_mb), Some(used_mb)) = (gpu.memory_total_mb, gpu.memory_used_mb) {
                     let usage_percent = if total_mb > 0 {
                         (used_mb as f32 / total_mb as f32) * 100.0
                     } else {
                         0.0
                     };
-                    lines.push(format!("│  Memory: {:.1}GB", total_mb as f64 / 1024.0));
-                    lines.push(render_bar("│  Use", usage_percent));
-                    lines.push(format!("│  Used: {:.1}GB", used_mb as f64 / 1024.0));
+
+                    let mem_bar = render_wide_bar("Mem", usage_percent);
+                    let mem_paragraph = Paragraph::new(format!(
+                        "GPU {}: {} - Memory {:.1}GB
+{}",
+                        gpu.index,
+                        gpu.name,
+                        total_mb as f64 / 1024.0,
+                        mem_bar
+                    ))
+                    .block(Block::default())
+                    .style(Style::default())
+                    .alignment(Alignment::Left);
+                    frame.render_widget(mem_paragraph, gpu_sections[0]);
                 } else {
-                    lines.push("│  Memory: N/A".to_string());
+                    let no_mem_info = Paragraph::new(format!(
+                        "GPU {}: {}
+Memory: N/A",
+                        gpu.index, gpu.name
+                    ))
+                    .block(Block::default())
+                    .alignment(Alignment::Left);
+                    frame.render_widget(no_mem_info, gpu_sections[0]);
                 }
 
+                // Temperature Display
                 if let Some(temp) = gpu.temperature_c {
-                    lines.push(format!("│  Temp: {:.1}°C", temp));
+                    let temp_paragraph = Paragraph::new(format!("Temperature: {:.1}°C", temp))
+                        .block(Block::default())
+                        .style(Style::default())
+                        .alignment(Alignment::Left);
+                    frame.render_widget(temp_paragraph, gpu_sections[1]);
                 } else {
-                    lines.push("│  Temp: N/A".to_string());
+                    let no_temp_info = Paragraph::new("Temperature: N/A")
+                        .block(Block::default())
+                        .alignment(Alignment::Left);
+                    frame.render_widget(no_temp_info, gpu_sections[1]);
                 }
 
-                if gpu.index < gpus.len() as u32 - 1 {
-                    lines.push("│".to_string());
-                }
-            }
-
-            let paragraph = Paragraph::new(lines.join(
-                "
+                // GPU Info
+                let info_lines = [
+                    format!("Index: {}", gpu.index),
+                    format!("Name: {}", gpu.name),
+                ];
+                let info_paragraph = Paragraph::new(info_lines.join(
+                    "
 ",
-            ))
-            .style(Style::default())
-            .alignment(Alignment::Left);
-            frame.render_widget(paragraph, gpu_inner);
+                ))
+                .style(Style::default())
+                .alignment(Alignment::Left);
+                frame.render_widget(info_paragraph, gpu_sections[2]);
+            } else {
+                // Multiple GPUs - use compact text display
+                let mut lines = vec![format!("GPU Count: {}", gpus.len())];
+
+                for gpu in &gpus {
+                    lines.push(format!("┌─ GPU {}: {}", gpu.index, gpu.name));
+
+                    if let (Some(total_mb), Some(used_mb)) =
+                        (gpu.memory_total_mb, gpu.memory_used_mb)
+                    {
+                        let usage_percent = if total_mb > 0 {
+                            (used_mb as f32 / total_mb as f32) * 100.0
+                        } else {
+                            0.0
+                        };
+                        lines.push(format!("│  Memory: {:.1}GB", total_mb as f64 / 1024.0));
+                        lines.push(render_bar("│  Use", usage_percent));
+                        lines.push(format!("│  Used: {:.1}GB", used_mb as f64 / 1024.0));
+                    } else {
+                        lines.push("│  Memory: N/A".to_string());
+                    }
+
+                    if let Some(temp) = gpu.temperature_c {
+                        lines.push(format!("│  Temp: {:.1}°C", temp));
+                    } else {
+                        lines.push("│  Temp: N/A".to_string());
+                    }
+
+                    if gpu.index < gpus.len() as u32 - 1 {
+                        lines.push("│".to_string());
+                    }
+                }
+
+                let paragraph = Paragraph::new(lines.join(""))
+                    .style(Style::default())
+                    .alignment(Alignment::Left);
+                frame.render_widget(paragraph, gpu_inner);
+            }
         } else {
             let paragraph = Paragraph::new("No GPUs detected")
                 .block(Block::default())
@@ -324,14 +497,27 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 }
 
 fn render_bar(label: &str, percent: f32) -> String {
-    let width = 14;
+    let width = 8;
     let filled = (percent / 100.0 * width as f32).round() as usize;
     let empty = width - filled;
     format!(
-        "{:>3} [{}{}] {:>5.1}%",
+        "{:>3} [{}{}] {:>3.0}%",
         label,
-        "█".repeat(filled),
-        " ".repeat(empty),
+        "▓".repeat(filled),
+        "░".repeat(empty),
+        percent
+    )
+}
+
+fn render_wide_bar(label: &str, percent: f32) -> String {
+    let width = 20; // Wider bar for main usage displays
+    let filled = (percent / 100.0 * width as f32).round() as usize;
+    let empty = width - filled;
+    format!(
+        "{:>3} [{}{}] {:>4.1}%",
+        label,
+        "▓".repeat(filled),
+        "░".repeat(empty),
         percent
     )
 }
