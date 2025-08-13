@@ -258,6 +258,7 @@ impl App {
             interval: Duration::from_secs(5),
             jobs: vec![
                 DetailsJobKind::Cpu(self.details_states.cpu.clone()),
+                DetailsJobKind::CpuTimeline(self.details_states.cpu_timeline.clone()),
                 DetailsJobKind::Mem(self.details_states.mem.clone()),
                 DetailsJobKind::Disk(self.details_states.disk.clone()),
                 DetailsJobKind::Gpu(self.details_states.gpu.clone()),

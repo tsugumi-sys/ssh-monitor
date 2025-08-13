@@ -3,6 +3,7 @@ use ratatui::widgets::*;
 
 use futures::executor::block_on;
 
+use super::timeline_chart::TimelineChart;
 use crate::App;
 
 pub fn render(app: &mut App, frame: &mut Frame) {
@@ -71,14 +72,17 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     frame.render_widget(cpu_block, cpu_mem_chunks[0]);
 
     if let Some(cpu) = cpu_detail {
-        // Split CPU area into gauge, spacer, cores, and info sections
+        // Get CPU timeline data
+        let cpu_timeline = block_on(app.details_states.cpu_timeline.get());
+
+        // Split CPU area into gauge, cores, info, and chart sections
         let cpu_sections = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(3), // Gauge (model + usage)
-                Constraint::Length(1), // Spacer
                 Constraint::Length(4), // Per-core usage
-                Constraint::Min(0),    // Additional info
+                Constraint::Length(2), // Additional info
+                Constraint::Min(8),    // Timeline chart (takes remaining space, min 8 lines)
             ])
             .split(cpu_inner);
 
@@ -109,10 +113,6 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         .alignment(Alignment::Left);
         frame.render_widget(cpu_paragraph, gauge_sections[1]);
 
-        // Spacer between total and per-core usage
-        let spacer = Paragraph::new("").style(Style::default());
-        frame.render_widget(spacer, cpu_sections[1]);
-
         // Per-core usage
         let core_lines: Vec<String> = cpu
             .per_core
@@ -134,13 +134,22 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         .block(Block::default().title("Per-Core Usage"))
         .style(Style::default())
         .alignment(Alignment::Left);
-        frame.render_widget(cores_paragraph, cpu_sections[2]);
+        frame.render_widget(cores_paragraph, cpu_sections[1]);
 
         // Additional CPU info area
         let cpu_info = Paragraph::new(format!("Cores: {}", cpu.per_core.len()))
             .style(Style::default())
             .alignment(Alignment::Left);
-        frame.render_widget(cpu_info, cpu_sections[3]);
+        frame.render_widget(cpu_info, cpu_sections[2]);
+
+        // CPU Timeline Chart at the bottom
+        let timeline_chart = TimelineChart::new("CPU Usage Timeline", host_id)
+            .data(cpu_timeline.timeline_data.clone())
+            .y_bounds((0.0, 100.0))
+            .y_unit("%")
+            .color(Color::Cyan);
+
+        timeline_chart.render(frame, cpu_sections[3]);
     } else {
         let paragraph = Paragraph::new("No CPU data")
             .block(Block::default())

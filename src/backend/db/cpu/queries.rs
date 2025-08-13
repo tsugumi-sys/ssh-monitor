@@ -69,3 +69,34 @@ pub async fn fetch_latest_cpu_detail_all(
     }
     Ok(results)
 }
+
+#[derive(Debug, Clone)]
+pub struct CpuTimelineRow {
+    pub host_id: String,
+    pub usage_percent: f32,
+    pub timestamp: String,
+}
+
+pub async fn fetch_cpu_usage_timeline(
+    conn: &Arc<Mutex<Connection>>,
+) -> Result<Vec<CpuTimelineRow>> {
+    let conn = conn.lock().await;
+    let mut stmt = conn.prepare(
+        "SELECT host_id, usage_percent, timestamp \
+         FROM cpu_results \
+         ORDER BY timestamp DESC, host_id \
+         LIMIT 1000",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok(CpuTimelineRow {
+            host_id: row.get::<_, String>(0)?,
+            usage_percent: row.get::<_, f64>(1)? as f32,
+            timestamp: row.get::<_, String>(2)?,
+        })
+    })?;
+    let mut results = vec![];
+    for r in rows {
+        results.push(r?);
+    }
+    Ok(results)
+}

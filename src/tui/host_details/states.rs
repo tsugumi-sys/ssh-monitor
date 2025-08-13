@@ -17,6 +17,51 @@ pub struct CpuDetailSnapshot {
 }
 
 #[derive(Debug, Clone, Default)]
+pub struct CpuTimelineSnapshot {
+    pub timeline_data: Vec<(String, f32, String)>, // (host_id, usage_percent, timestamp)
+}
+
+#[derive(Debug, Clone)]
+pub struct CpuTimelineStates {
+    data: Arc<RwLock<CpuTimelineSnapshot>>,
+}
+
+impl Default for CpuTimelineStates {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl CpuTimelineStates {
+    pub fn new() -> Self {
+        Self {
+            data: Arc::new(RwLock::new(CpuTimelineSnapshot::default())),
+        }
+    }
+
+    pub async fn get(&self) -> CpuTimelineSnapshot {
+        self.data.read().await.clone()
+    }
+
+    pub async fn update_from_db(
+        &self,
+        conn: &Arc<tokio::sync::Mutex<rusqlite::Connection>>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        use crate::backend::db::cpu::queries::fetch_cpu_usage_timeline;
+
+        let timeline_rows = fetch_cpu_usage_timeline(conn).await?;
+        let timeline_data = timeline_rows
+            .into_iter()
+            .map(|row| (row.host_id, row.usage_percent, row.timestamp))
+            .collect();
+
+        let snapshot = CpuTimelineSnapshot { timeline_data };
+        *self.data.write().await = snapshot;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct MemDetailSnapshot {
     pub total_mb: u64,
     pub used_mb: u64,
@@ -261,6 +306,7 @@ impl GpuDetailStates {
 #[derive(Debug, Clone, Default)]
 pub struct HostDetailsState {
     pub cpu: Arc<CpuDetailStates>,
+    pub cpu_timeline: Arc<CpuTimelineStates>,
     pub mem: Arc<MemDetailStates>,
     pub disk: Arc<DiskDetailStates>,
     pub gpu: Arc<GpuDetailStates>,
@@ -270,6 +316,7 @@ impl HostDetailsState {
     pub fn new() -> Self {
         Self {
             cpu: Arc::new(CpuDetailStates::new()),
+            cpu_timeline: Arc::new(CpuTimelineStates::new()),
             mem: Arc::new(MemDetailStates::new()),
             disk: Arc::new(DiskDetailStates::new()),
             gpu: Arc::new(GpuDetailStates::new()),
@@ -280,6 +327,7 @@ impl HostDetailsState {
 #[derive(Clone, Debug)]
 pub enum DetailsJobKind {
     Cpu(Arc<CpuDetailStates>),
+    CpuTimeline(Arc<CpuTimelineStates>),
     Mem(Arc<MemDetailStates>),
     Disk(Arc<DiskDetailStates>),
     Gpu(Arc<GpuDetailStates>),
@@ -290,6 +338,7 @@ impl StateJob for DetailsJobKind {
     fn name(&self) -> &'static str {
         match self {
             DetailsJobKind::Cpu(_) => "cpu_detail",
+            DetailsJobKind::CpuTimeline(_) => "cpu_timeline",
             DetailsJobKind::Mem(_) => "mem_detail",
             DetailsJobKind::Disk(_) => "disk_detail",
             DetailsJobKind::Gpu(_) => "gpu_detail",
@@ -299,6 +348,10 @@ impl StateJob for DetailsJobKind {
     async fn update(&self, conn: &Arc<Mutex<Connection>>) -> Result<()> {
         match self {
             DetailsJobKind::Cpu(state) => state.update_from_db(conn).await,
+            DetailsJobKind::CpuTimeline(state) => state
+                .update_from_db(conn)
+                .await
+                .map_err(|e| anyhow::anyhow!(e)),
             DetailsJobKind::Mem(state) => state.update_from_db(conn).await,
             DetailsJobKind::Disk(state) => state.update_from_db(conn).await,
             DetailsJobKind::Gpu(state) => state.update_from_db(conn).await,

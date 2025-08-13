@@ -1,4 +1,5 @@
 pub mod states;
+pub mod timeline_chart;
 pub mod update;
 pub mod view;
 
