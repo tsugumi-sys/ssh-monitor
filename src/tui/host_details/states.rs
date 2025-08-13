@@ -335,7 +335,6 @@ impl GpuDetailStates {
                 .push(gpu_snapshot);
         }
 
-        // Sort GPUs by index for each host
         for gpu_list in map.values_mut() {
             gpu_list.sort_by_key(|gpu| gpu.index);
         }

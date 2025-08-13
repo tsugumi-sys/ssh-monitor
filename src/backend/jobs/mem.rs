@@ -92,7 +92,6 @@ pub fn parse_mem(output: &str) -> Result<Option<JobResult>> {
                 }
             }
 
-            // Only count necessary pages
             let used_pages: u64 = counters.values().sum();
             let used_mb = (used_pages * page_size) / 1024 / 1024;
             let total_mb = total_bytes / 1024 / 1024;

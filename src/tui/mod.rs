@@ -16,7 +16,6 @@ async fn test_cpu_job_executor_runs() {
     let cpu_states = CpuStates::new();
     let job = ListSshJobKind::Cpu(cpu_states.clone().into());
 
-    // Insert a fake CPU result for host_id = "test-host"
     {
         let insert = CpuResultInsert {
             host_id: "test-host".to_string(),
@@ -38,10 +37,8 @@ async fn test_cpu_job_executor_runs() {
     executor.register_group(job_group).await;
     executor.run_all().await;
 
-    // Let it run long enough to trigger the update
     tokio::time::sleep(Duration::from_millis(200)).await;
 
-    // Assert CpuStates is updated
     let snapshot = cpu_states.get("test-host").await;
     assert!(snapshot.is_some());
 

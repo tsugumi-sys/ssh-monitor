@@ -4,10 +4,8 @@ use serde::Serialize;
 
 pub const CPU_COMMAND: &str = r#"bash -c '
   if [[ "$(uname)" == "Darwin" ]]; then
-    # macOS-specific commands
     sysctl -a | grep machdep.cpu && echo __LSTCPU__ && ps -A -o %cpu && echo __PSCPU__ && ps aux | awk "NR>1 {sum+=$3} END {print sum}" && echo __MPSTAT__;
   else
-    # Linux-specific commands using /proc/stat for per-core statistics
     lscpu && echo __STAT__ && cat /proc/stat | grep "cpu" | awk '\''{usage=($2+$3+$4+$6+$7)*100/($2+$3+$4+$5+$6+$7+$8+$9+$10); print $1, usage}'\'' && echo __PSCPU__;
   fi
 '"#;
@@ -79,12 +77,10 @@ pub fn parse_cpu(output: &str) -> Result<Option<JobResult>> {
     } else {
         let mut per_core_usages = vec![];
 
-        // Parse per-core usage lines for each CPU (e.g., cpu0, cpu1, ..., cpu31)
         for line in stat_part.lines() {
             if line.starts_with("cpu") && !line.contains("cpu ") {
                 let cpu_usage_data: Vec<&str> = line.split_whitespace().collect();
                 if cpu_usage_data.len() > 1 {
-                    // Extract the percentage of CPU usage
                     if let Ok(usage) = cpu_usage_data[1].trim_end_matches('%').parse::<f32>() {
                         per_core_usages.push(usage);
                     }
@@ -92,7 +88,6 @@ pub fn parse_cpu(output: &str) -> Result<Option<JobResult>> {
             }
         }
 
-        // Calculate overall CPU usage by averaging the per-core usage values
         let usage_percent = if !per_core_usages.is_empty() {
             per_core_usages.iter().sum::<f32>() / per_core_usages.len() as f32
         } else {
@@ -122,7 +117,6 @@ mod tests {
 
     #[test]
     fn test_parse_cpu() -> Result<()> {
-        // Mocked output (as if this is the output from your CPU_COMMAND)
         let input = r#"
 __BEGIN_cpu__
 Architecture:                         x86_64
@@ -203,23 +197,17 @@ __PSCPU__
 __END_cpu__
 "#;
 
-        // Call the parse_cpu function with the mocked input
         let result = parse_cpu(input)?;
 
-        // Assertions for the CPU Info struct
         if let Some(job_result) = result {
             let cpu_info: CpuInfo = job_result.value.downcast_ref::<CpuInfo>().unwrap().clone();
 
-            // Ensure the model name is parsed correctly
             assert_eq!(cpu_info.model_name, "AMD Ryzen 9 5950X 16-Core Processor");
 
-            // Ensure the core count is 32 (as per the mocked input)
             assert_eq!(cpu_info.core_count, 32);
 
-            // Ensure usage_percent is computed correctly
             assert_eq!(cpu_info.usage_percent, 1.2262607);
 
-            // Ensure that per_core values are populated
             assert_eq!(cpu_info.per_core.len(), 32); // There should be 32 cores
         } else {
             panic!("Failed to parse CPU information");

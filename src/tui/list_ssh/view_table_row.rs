@@ -4,7 +4,6 @@ use crate::tui::list_ssh::states::{CpuSnapshot, DiskSnapshot, MemSnapshot};
 use ratatui::prelude::*;
 use ratatui::widgets::*;
 
-/// Render a single table row for a given SSH host and optional CPU snapshot.
 pub fn render(
     i: usize,
     info: &SshHostInfo,
@@ -13,23 +12,19 @@ pub fn render(
     mem: &Option<MemSnapshot>,
     disk: &Option<DiskSnapshot>,
 ) -> Row<'static> {
-    // Alternate row background
     let bg = if i % 2 == 0 {
         colors.normal_row_color
     } else {
         colors.alt_row_color
     };
 
-    // Format user@host:port
     let user_at_host = format!("{}@{}:{}", info.user, info.ip, info.port);
 
-    // Format CPU usage text
     let cpu_text = cpu
         .as_ref()
         .map(|c| format!("{:.1}% / {}cores", c.usage_percent, c.core_count))
         .unwrap_or_else(|| "-".to_string());
 
-    // Format memory usage text
     let mem_text = mem
         .as_ref()
         .map(|m| {
@@ -42,7 +37,6 @@ pub fn render(
         })
         .unwrap_or_else(|| "-".to_string());
 
-    // Format disk usage text
     let disk_text = disk
         .as_ref()
         .map(|d| {

@@ -11,7 +11,6 @@ pub fn connect_ssh_session(info: &SshHostInfo) -> Result<Session, String> {
         _ => info.ip.clone(),
     };
 
-    // Construct SocketAddr from resolved address
     let socket_addr = format!("{}:{}", socket_addr, info.port)
         .parse::<SocketAddr>()
         .map_err(|e| format!("Invalid address: {}", e))?;

@@ -28,9 +28,9 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(4),      // Host info
-            Constraint::Percentage(50), // CPU & Memory row
-            Constraint::Percentage(50), // GPU & Disk row
+            Constraint::Length(4),
+            Constraint::Percentage(50),
+            Constraint::Percentage(50),
         ])
         .split(area);
 
@@ -58,7 +58,6 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         frame.render_widget(paragraph, info_inner);
     }
 
-    // Split the first row into CPU and Memory side by side
     let cpu_mem_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
@@ -72,10 +71,8 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     frame.render_widget(cpu_block, cpu_mem_chunks[0]);
 
     if let Some(cpu) = cpu_detail {
-        // Get CPU timeline data
         let cpu_timeline = block_on(app.details_states.cpu_timeline.get());
 
-        // Split CPU area into gauge, cores, info, and chart sections
         let cpu_sections = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
@@ -86,7 +83,6 @@ pub fn render(app: &mut App, frame: &mut Frame) {
             ])
             .split(cpu_inner);
 
-        // Split gauge section for model name and usage gauge
         let gauge_sections = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
@@ -95,13 +91,11 @@ pub fn render(app: &mut App, frame: &mut Frame) {
             ])
             .split(cpu_sections[0]);
 
-        // CPU Model Name
         let model_paragraph = Paragraph::new(format!("Model: {}", cpu.model_name))
             .style(Style::default().fg(Color::White))
             .alignment(Alignment::Left);
         frame.render_widget(model_paragraph, gauge_sections[0]);
 
-        // CPU Usage Bar
         let cpu_bar = render_wide_bar("CPU", cpu.usage_percent);
         let cpu_paragraph = Paragraph::new(format!(
             "Total CPU Usage
@@ -113,7 +107,6 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         .alignment(Alignment::Left);
         frame.render_widget(cpu_paragraph, gauge_sections[1]);
 
-        // Per-core usage
         let core_lines: Vec<String> = cpu
             .per_core
             .iter()
@@ -136,13 +129,11 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         .alignment(Alignment::Left);
         frame.render_widget(cores_paragraph, cpu_sections[1]);
 
-        // Additional CPU info area
         let cpu_info = Paragraph::new(format!("Cores: {}", cpu.per_core.len()))
             .style(Style::default())
             .alignment(Alignment::Left);
         frame.render_widget(cpu_info, cpu_sections[2]);
 
-        // CPU Timeline Chart at the bottom
         let timeline_chart = TimelineChart::new("CPU Usage", host_id)
             .data(cpu_timeline.timeline_data.clone())
             .y_bounds((0.0, 100.0))
@@ -165,10 +156,8 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     frame.render_widget(mem_block, cpu_mem_chunks[1]);
 
     if let Some(mem) = mem_detail {
-        // Get Memory timeline data
         let mem_timeline = block_on(app.details_states.mem_timeline.get());
 
-        // Split Memory area into gauge, details, and chart sections (aligned with CPU layout)
         let mem_sections = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
@@ -178,7 +167,6 @@ pub fn render(app: &mut App, frame: &mut Frame) {
             ])
             .split(mem_inner);
 
-        // Memory Bar
         let mem_bar = render_wide_bar("Mem", mem.used_percent);
         let mem_paragraph = Paragraph::new(format!(
             "Memory: {:.1}GB ({:.1}%)
@@ -192,7 +180,6 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         .alignment(Alignment::Left);
         frame.render_widget(mem_paragraph, mem_sections[0]);
 
-        // Memory Details
         let lines = [
             format!("Used: {:.1}GB", mem.used_mb as f64 / 1024.0),
             format!("Free: {:.1}GB", mem.free_mb as f64 / 1024.0),
@@ -210,7 +197,6 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         .alignment(Alignment::Left);
         frame.render_widget(details_paragraph, mem_sections[1]);
 
-        // Memory Timeline Chart at the bottom
         let mem_timeline_chart = TimelineChart::new("Memory Usage", host_id)
             .data(mem_timeline.timeline_data.clone())
             .y_bounds((0.0, 100.0))
@@ -225,7 +211,6 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         frame.render_widget(paragraph, mem_inner);
     }
 
-    // Split the second row into GPU and Disk side by side
     let gpu_disk_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
@@ -239,17 +224,14 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     frame.render_widget(disk_block, gpu_disk_chunks[1]);
 
     if let Some(disk) = disk_detail {
-        // Calculate comprehensive overview metrics
         let free_mb = disk.total_mb.saturating_sub(disk.used_mb);
         let total_gb = disk.total_mb as f64 / 1024.0;
         let used_gb = disk.used_mb as f64 / 1024.0;
         let free_gb = free_mb as f64 / 1024.0;
 
-        // Try to get detailed volume data for enhanced overview
         let (volume_count, overview_content) =
             if let Ok(volumes) = block_on(app.details_states.disk.get_volumes(host_id, &app.db)) {
                 if !volumes.is_empty() {
-                    // Enhanced overview with volume count and detailed metrics
                     let volume_count = volumes.len();
                     let content = vec![
                         format!("Storage Overview ({} volumes)", volume_count),
@@ -259,7 +241,6 @@ pub fn render(app: &mut App, frame: &mut Frame) {
                     ];
                     (volume_count, content)
                 } else {
-                    // Simple overview if no volumes
                     let content = vec![
                         format!("Total: {:.1} GB", total_gb),
                         render_wide_bar("Usage", disk.used_percent),
@@ -268,7 +249,6 @@ pub fn render(app: &mut App, frame: &mut Frame) {
                     (0, content)
                 }
             } else {
-                // Fallback overview
                 let content = vec![
                     format!("Total: {:.1} GB", total_gb),
                     render_bar("Usage", disk.used_percent),
@@ -278,7 +258,6 @@ pub fn render(app: &mut App, frame: &mut Frame) {
             };
 
         if volume_count > 0 {
-            // Split the disk area into overview, spacer, and table sections
             let disk_chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
@@ -288,7 +267,6 @@ pub fn render(app: &mut App, frame: &mut Frame) {
                 ])
                 .split(disk_inner);
 
-            // Render enhanced overview
             let overview_paragraph = Paragraph::new(overview_content.join(
                 "
 ",
@@ -297,13 +275,10 @@ pub fn render(app: &mut App, frame: &mut Frame) {
             .alignment(Alignment::Left);
             frame.render_widget(overview_paragraph, disk_chunks[0]);
 
-            // Render spacer (empty line)
             let spacer = Paragraph::new("").style(Style::default());
             frame.render_widget(spacer, disk_chunks[1]);
 
-            // Get volumes again for table rendering
             if let Ok(volumes) = block_on(app.details_states.disk.get_volumes(host_id, &app.db)) {
-                // Sort volumes by usage percentage (descending) and take top 5
                 let mut sorted_volumes = volumes.clone();
                 sorted_volumes.sort_by(|a, b| {
                     b.used_percent
@@ -312,12 +287,10 @@ pub fn render(app: &mut App, frame: &mut Frame) {
                 });
                 let top_volumes: Vec<_> = sorted_volumes.into_iter().take(5).collect();
 
-                // Create table with border and title
                 let table_block = Block::default().title("Volume Details (Top 5 by Usage)");
                 let table_inner = table_block.inner(disk_chunks[2]);
                 frame.render_widget(table_block, disk_chunks[2]);
 
-                // Create table headers
                 let header = Row::new(vec!["Mount Point", "Size", "Used", "Avail", "Use%"])
                     .style(
                         Style::default()
@@ -326,7 +299,6 @@ pub fn render(app: &mut App, frame: &mut Frame) {
                     )
                     .height(1);
 
-                // Create table rows from top volumes data with improved formatting
                 let rows: Vec<Row> = top_volumes
                     .iter()
                     .map(|vol| {
@@ -365,7 +337,6 @@ pub fn render(app: &mut App, frame: &mut Frame) {
                 frame.render_widget(table, table_inner);
             }
         } else {
-            // Show only overview if no volume data
             let paragraph = Paragraph::new(overview_content.join(
                 "
 ",
@@ -391,7 +362,6 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     if let Some(gpus) = gpu_detail {
         if !gpus.is_empty() {
             if gpus.len() == 1 {
-                // Single GPU - use gauges for better visualization
                 let gpu = &gpus[0];
                 let gpu_sections = Layout::default()
                     .direction(Direction::Vertical)
@@ -402,7 +372,6 @@ pub fn render(app: &mut App, frame: &mut Frame) {
                     ])
                     .split(gpu_inner);
 
-                // GPU Memory Bar
                 if let (Some(total_mb), Some(used_mb)) = (gpu.memory_total_mb, gpu.memory_used_mb) {
                     let usage_percent = if total_mb > 0 {
                         (used_mb as f32 / total_mb as f32) * 100.0
@@ -434,7 +403,6 @@ Memory: N/A",
                     frame.render_widget(no_mem_info, gpu_sections[0]);
                 }
 
-                // Temperature Display
                 if let Some(temp) = gpu.temperature_c {
                     let temp_paragraph = Paragraph::new(format!("Temperature: {:.1}°C", temp))
                         .block(Block::default())
@@ -448,7 +416,6 @@ Memory: N/A",
                     frame.render_widget(no_temp_info, gpu_sections[1]);
                 }
 
-                // GPU Info
                 let info_lines = [
                     format!("Index: {}", gpu.index),
                     format!("Name: {}", gpu.name),
@@ -461,7 +428,6 @@ Memory: N/A",
                 .alignment(Alignment::Left);
                 frame.render_widget(info_paragraph, gpu_sections[2]);
             } else {
-                // Multiple GPUs - use compact text display
                 let mut lines = vec![format!("GPU Count: {}", gpus.len())];
 
                 for gpu in &gpus {
@@ -515,7 +481,7 @@ Memory: N/A",
 fn render_bar(label: &str, percent: f32) -> String {
     let width = 8;
     let filled = (percent / 100.0 * width as f32).round() as usize;
-    let filled = filled.min(width); // Prevent overflow by clamping to width
+    let filled = filled.min(width);
     let empty = width - filled;
     format!(
         "{:>3} [{}{}] {:>3.0}%",
@@ -527,9 +493,9 @@ fn render_bar(label: &str, percent: f32) -> String {
 }
 
 fn render_wide_bar(label: &str, percent: f32) -> String {
-    let width = 20; // Wider bar for main usage displays
+    let width = 20;
     let filled = (percent / 100.0 * width as f32).round() as usize;
-    let filled = filled.min(width); // Prevent overflow by clamping to width
+    let filled = filled.min(width);
     let empty = width - filled;
     format!(
         "{:>3} [{}{}] {:>4.1}%",

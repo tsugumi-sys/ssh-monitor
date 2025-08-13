@@ -87,13 +87,11 @@ mod tests {
         let infos: &Vec<GpuInfo> = job_result.value.downcast_ref::<Vec<GpuInfo>>().unwrap();
         assert_eq!(infos.len(), 2);
 
-        // Check first GPU info
         assert_eq!(infos[0].name, "GeForce GTX 1080 Ti");
         assert_eq!(infos[0].memory_total_mb, Some(11178));
         assert_eq!(infos[0].memory_used_mb, Some(4523));
         assert_eq!(infos[0].temperature_c, Some(70.0));
 
-        // Check second GPU info
         assert_eq!(infos[1].name, "Tesla K80");
         assert_eq!(infos[1].memory_total_mb, Some(11441));
         assert_eq!(infos[1].memory_used_mb, Some(0));
@@ -133,7 +131,6 @@ Graphics/Displays:
         let infos: &Vec<GpuInfo> = job_result.value.downcast_ref::<Vec<GpuInfo>>().unwrap();
         assert_eq!(infos.len(), 1);
 
-        // Check macOS GPU info
         assert_eq!(infos[0].name, "Apple M3 Pro");
         assert_eq!(infos[0].memory_total_mb, None);
         assert_eq!(infos[0].memory_used_mb, None);

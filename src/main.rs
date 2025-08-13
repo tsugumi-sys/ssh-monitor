@@ -89,14 +89,11 @@ impl App {
             mem_states,
             disk_states,
             details_states,
-            // Table
             table_height: 0,
             table_state: TableState::default().with_selected(Some(0)),
             selected_id,
-            // Vertical Scrolling
             vertical_scroll: 0,
             vertical_scroll_state: ScrollbarState::new(0),
-            // Search
             search_query: String::new(),
             visible_hosts,
         }
@@ -130,11 +127,6 @@ impl App {
         Ok(())
     }
 
-    /// Renders the user interface.
-    ///
-    /// This is where you add new widgets. See the following resources for more information:
-    /// - <https://docs.rs/ratatui/latest/ratatui/widgets/index.html>
-    /// - <https://github.com/ratatui/ratatui/tree/master/examples>
     fn draw(&mut self, frame: &mut Frame) {
         match self.mode {
             AppMode::List | AppMode::Search => render_list(self, frame),
@@ -142,7 +134,6 @@ impl App {
         }
     }
 
-    /// Reads the crossterm events and updates the state of [`App`].
     async fn handle_crossterm_events(&mut self) -> Result<()> {
         tokio::select! {
             event = self.event_stream.next().fuse() => {
@@ -158,7 +149,6 @@ impl App {
                 }
             }
             _ = tokio::time::sleep(tokio::time::Duration::from_millis(100)) => {
-                // Sleep for a short duration to avoid busy waiting.
             }
         }
         Ok(())

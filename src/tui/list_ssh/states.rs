@@ -175,10 +175,6 @@ impl CpuStates {
     }
 }
 
-// ────────────────────────────
-// List View Job Kind Enum
-// ────────────────────────────
-
 #[derive(Clone, Debug)]
 pub enum ListSshJobKind {
     Cpu(Arc<CpuStates>),

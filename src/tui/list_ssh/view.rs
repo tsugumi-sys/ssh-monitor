@@ -32,9 +32,6 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         ])
         .split(area);
 
-    /*
-    Title/Search
-    */
     if app.mode == AppMode::Search {
         let input = Paragraph::new(app.search_query.as_str())
             .block(
@@ -52,9 +49,6 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         frame.render_widget(title, chunks[0]);
     }
 
-    /*
-    Display Database Path (above connection summary)
-    */
     let db_path = get_default_db_path();
     let db_path_text = format!("Database Path: {}", db_path.display());
     let db_path_paragraph = Paragraph::new(db_path_text)
@@ -64,11 +58,8 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 
     frame.render_widget(db_path_paragraph, chunks[1]);
 
-    // Get hosts
     let hosts_guard = block_on(app.ssh_hosts.lock());
     let hosts = &*hosts_guard;
-
-    // Prefetch CPU, Memory and Disk snapshot maps safely
     let cpu_map = block_on(app.cpu_states.snapshot_map());
     let mem_map = block_on(app.mem_states.snapshot_map());
     let disk_map = block_on(app.disk_states.snapshot_map());
@@ -97,9 +88,6 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         .map(|(id, info, _, _, _)| (id.clone(), info.clone()))
         .collect();
 
-    /*
-    Table
-    */
     let grid_area = chunks[2];
     app.table_height = grid_area.height.saturating_sub(3) as usize;
 
@@ -152,9 +140,6 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 
     frame.render_stateful_widget(table, grid_area, &mut app.table_state);
 
-    /*
-    Footer
-    */
     let footer = Paragraph::new(vec![Line::from("ESC: Exit | ↑↓: Scroll | /: Search")])
         .alignment(Alignment::Center)
         .style(

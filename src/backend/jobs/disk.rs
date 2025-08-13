@@ -47,7 +47,6 @@ pub fn parse_disk(output: &str) -> Result<Option<JobResult>> {
 mod tests {
     use super::*;
 
-    // Sample input data (df -h command output)
     const SAMPLE_OUTPUT: &str = r#"
 /dev/disk3s1s1    471482  15125     48654    24%    /
 devfs                  0      0         0   100%    /dev
@@ -71,23 +70,19 @@ map auto_home          0      0         0   100%    /System/Volumes/Data/home
         let result = parse_disk(SAMPLE_OUTPUT);
         assert!(result.is_ok());
 
-        // Unwrap the Option<JobResult> to get the JobResult
         let job_result = result.unwrap().expect("Job result should be present");
 
         assert_eq!(job_result.job_name, "disk");
 
-        // Clone the value from the JobResult (downcast_ref and then clone)
         let disk_info_list: Vec<DiskInfo> =
             (*job_result.value.downcast_ref::<Vec<DiskInfo>>().unwrap()).clone();
 
-        // Validate the first entry
         assert_eq!(disk_info_list[0].mount_point, "/");
         assert_eq!(disk_info_list[0].total_mb, 471482);
         assert_eq!(disk_info_list[0].used_mb, 15125);
         assert_eq!(disk_info_list[0].available_mb, 48654);
         assert_eq!(disk_info_list[0].used_percent, 24.0);
 
-        // Validate the last entry
         assert_eq!(
             disk_info_list[disk_info_list.len() - 1].mount_point,
             "/System/Volumes/Update/mnt1"

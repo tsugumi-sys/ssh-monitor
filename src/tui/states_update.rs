@@ -7,10 +7,8 @@ use tokio::{task, time};
 
 #[async_trait::async_trait]
 pub trait StateJob: Send + Sync {
-    /// Name of the job (e.g. "cpu", "mem")
     fn name(&self) -> &'static str;
 
-    /// Performs the update from DB or other source
     async fn update(&self, db: &Arc<Mutex<Connection>>) -> Result<()>;
 }
 

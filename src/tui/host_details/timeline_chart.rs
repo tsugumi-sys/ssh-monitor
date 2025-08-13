@@ -52,7 +52,6 @@ impl<'a> TimelineChart<'a> {
             return;
         }
 
-        // Filter data for the current host and prepare chart data with timestamps
         let host_data_with_time: Vec<_> = self
             .data
             .iter()
@@ -67,7 +66,6 @@ impl<'a> TimelineChart<'a> {
             return;
         }
 
-        // Use all available data for the chart (reverse so newest is on the right)
         let chart_data: Vec<_> = host_data_with_time
             .iter()
             .rev() // Reverse to show oldest -> newest (left -> right)
@@ -78,7 +76,6 @@ impl<'a> TimelineChart<'a> {
         let data_count = chart_data.len();
         let max_x = (data_count - 1) as f64;
 
-        // Create x-axis labels with relative time (4 labels across the timeline)
         let x_labels = self.create_time_labels(&host_data_with_time, data_count);
 
         let datasets = vec![
@@ -119,12 +116,10 @@ impl<'a> TimelineChart<'a> {
             indices
                 .iter()
                 .map(|&idx| {
-                    // Map reversed index back to original timeline position
                     let original_idx = host_data_with_time.len() - 1 - idx;
                     if original_idx < host_data_with_time.len() {
                         let timestamp = &host_data_with_time[original_idx].2;
 
-                        // SQLite DATETIME format: "YYYY-MM-DD HH:MM:SS"
                         if let Ok(parsed) =
                             chrono::NaiveDateTime::parse_from_str(timestamp, "%Y-%m-%d %H:%M:%S")
                         {
@@ -147,7 +142,6 @@ impl<'a> TimelineChart<'a> {
                                 }
                             }
                         } else {
-                            // Fallback: show last 5 chars of timestamp (time part)
                             if timestamp.len() >= 5 {
                                 timestamp[timestamp.len() - 5..].to_string()
                             } else {
