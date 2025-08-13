@@ -36,3 +36,34 @@ pub async fn fetch_latest_mem_all(conn: &Arc<Mutex<Connection>>) -> Result<Vec<M
     }
     Ok(results)
 }
+
+#[derive(Debug, Clone)]
+pub struct MemTimelineRow {
+    pub host_id: String,
+    pub used_percent: f32,
+    pub timestamp: String,
+}
+
+pub async fn fetch_mem_usage_timeline(
+    conn: &Arc<Mutex<Connection>>,
+) -> Result<Vec<MemTimelineRow>> {
+    let conn = conn.lock().await;
+    let mut stmt = conn.prepare(
+        "SELECT host_id, used_percent, timestamp \
+         FROM mem_results \
+         ORDER BY timestamp DESC, host_id \
+         LIMIT 1000",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok(MemTimelineRow {
+            host_id: row.get::<_, String>(0)?,
+            used_percent: row.get::<_, f64>(1)? as f32,
+            timestamp: row.get::<_, String>(2)?,
+        })
+    })?;
+    let mut results = vec![];
+    for r in rows {
+        results.push(r?);
+    }
+    Ok(results)
+}

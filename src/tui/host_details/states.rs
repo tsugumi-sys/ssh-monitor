@@ -26,6 +26,51 @@ pub struct CpuTimelineStates {
     data: Arc<RwLock<CpuTimelineSnapshot>>,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct MemTimelineSnapshot {
+    pub timeline_data: Vec<(String, f32, String)>, // (host_id, used_percent, timestamp)
+}
+
+#[derive(Debug, Clone)]
+pub struct MemTimelineStates {
+    data: Arc<RwLock<MemTimelineSnapshot>>,
+}
+
+impl Default for MemTimelineStates {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl MemTimelineStates {
+    pub fn new() -> Self {
+        Self {
+            data: Arc::new(RwLock::new(MemTimelineSnapshot::default())),
+        }
+    }
+
+    pub async fn get(&self) -> MemTimelineSnapshot {
+        self.data.read().await.clone()
+    }
+
+    pub async fn update_from_db(
+        &self,
+        conn: &Arc<tokio::sync::Mutex<rusqlite::Connection>>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        use crate::backend::db::mem::queries::fetch_mem_usage_timeline;
+
+        let timeline_rows = fetch_mem_usage_timeline(conn).await?;
+        let timeline_data = timeline_rows
+            .into_iter()
+            .map(|row| (row.host_id, row.used_percent, row.timestamp))
+            .collect();
+
+        let snapshot = MemTimelineSnapshot { timeline_data };
+        *self.data.write().await = snapshot;
+        Ok(())
+    }
+}
+
 impl Default for CpuTimelineStates {
     fn default() -> Self {
         Self::new()
@@ -308,6 +353,7 @@ pub struct HostDetailsState {
     pub cpu: Arc<CpuDetailStates>,
     pub cpu_timeline: Arc<CpuTimelineStates>,
     pub mem: Arc<MemDetailStates>,
+    pub mem_timeline: Arc<MemTimelineStates>,
     pub disk: Arc<DiskDetailStates>,
     pub gpu: Arc<GpuDetailStates>,
 }
@@ -318,6 +364,7 @@ impl HostDetailsState {
             cpu: Arc::new(CpuDetailStates::new()),
             cpu_timeline: Arc::new(CpuTimelineStates::new()),
             mem: Arc::new(MemDetailStates::new()),
+            mem_timeline: Arc::new(MemTimelineStates::new()),
             disk: Arc::new(DiskDetailStates::new()),
             gpu: Arc::new(GpuDetailStates::new()),
         }
@@ -329,6 +376,7 @@ pub enum DetailsJobKind {
     Cpu(Arc<CpuDetailStates>),
     CpuTimeline(Arc<CpuTimelineStates>),
     Mem(Arc<MemDetailStates>),
+    MemTimeline(Arc<MemTimelineStates>),
     Disk(Arc<DiskDetailStates>),
     Gpu(Arc<GpuDetailStates>),
 }
@@ -340,6 +388,7 @@ impl StateJob for DetailsJobKind {
             DetailsJobKind::Cpu(_) => "cpu_detail",
             DetailsJobKind::CpuTimeline(_) => "cpu_timeline",
             DetailsJobKind::Mem(_) => "mem_detail",
+            DetailsJobKind::MemTimeline(_) => "mem_timeline",
             DetailsJobKind::Disk(_) => "disk_detail",
             DetailsJobKind::Gpu(_) => "gpu_detail",
         }
@@ -353,6 +402,10 @@ impl StateJob for DetailsJobKind {
                 .await
                 .map_err(|e| anyhow::anyhow!(e)),
             DetailsJobKind::Mem(state) => state.update_from_db(conn).await,
+            DetailsJobKind::MemTimeline(state) => state
+                .update_from_db(conn)
+                .await
+                .map_err(|e| anyhow::anyhow!(e)),
             DetailsJobKind::Disk(state) => state.update_from_db(conn).await,
             DetailsJobKind::Gpu(state) => state.update_from_db(conn).await,
         }

@@ -260,6 +260,7 @@ impl App {
                 DetailsJobKind::Cpu(self.details_states.cpu.clone()),
                 DetailsJobKind::CpuTimeline(self.details_states.cpu_timeline.clone()),
                 DetailsJobKind::Mem(self.details_states.mem.clone()),
+                DetailsJobKind::MemTimeline(self.details_states.mem_timeline.clone()),
                 DetailsJobKind::Disk(self.details_states.disk.clone()),
                 DetailsJobKind::Gpu(self.details_states.gpu.clone()),
             ],

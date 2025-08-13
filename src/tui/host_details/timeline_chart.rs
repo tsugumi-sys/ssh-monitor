@@ -83,18 +83,14 @@ impl<'a> TimelineChart<'a> {
 
         let datasets = vec![
             Dataset::default()
-                .name("Usage")
                 .marker(symbols::Marker::Braille)
                 .style(Style::default().fg(self.color))
+                .graph_type(GraphType::Line)
                 .data(&chart_data),
         ];
 
         let chart = Chart::new(datasets)
-            .block(
-                Block::default()
-                    .title(format!("{} ({} samples)", self.title, data_count))
-                    .borders(Borders::ALL),
-            )
+            .block(Block::default().title(self.title.to_string()))
             .x_axis(
                 Axis::default()
                     .title("")

@@ -143,7 +143,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         frame.render_widget(cpu_info, cpu_sections[2]);
 
         // CPU Timeline Chart at the bottom
-        let timeline_chart = TimelineChart::new("CPU Usage Timeline", host_id)
+        let timeline_chart = TimelineChart::new("CPU Usage", host_id)
             .data(cpu_timeline.timeline_data.clone())
             .y_bounds((0.0, 100.0))
             .y_unit("%")
@@ -165,13 +165,16 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     frame.render_widget(mem_block, cpu_mem_chunks[1]);
 
     if let Some(mem) = mem_detail {
-        // Split Memory area into gauge and details
+        // Get Memory timeline data
+        let mem_timeline = block_on(app.details_states.mem_timeline.get());
+
+        // Split Memory area into gauge, details, and chart sections (aligned with CPU layout)
         let mem_sections = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(3), // Gauge
-                Constraint::Length(3), // Sparkline
-                Constraint::Min(0),    // Details
+                Constraint::Length(6), // Details (combined to match CPU's per-core + info sections)
+                Constraint::Min(8),    // Timeline chart (takes remaining space, min 8 lines)
             ])
             .split(mem_inner);
 
@@ -189,19 +192,14 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         .alignment(Alignment::Left);
         frame.render_widget(mem_paragraph, mem_sections[0]);
 
-        // Memory statistics area
-        let mem_stats = Paragraph::new(format!(
-            "Available: {:.1}GB",
-            (mem.total_mb - mem.used_mb) as f64 / 1024.0
-        ))
-        .style(Style::default())
-        .alignment(Alignment::Left);
-        frame.render_widget(mem_stats, mem_sections[1]);
-
         // Memory Details
         let lines = [
             format!("Used: {:.1}GB", mem.used_mb as f64 / 1024.0),
             format!("Free: {:.1}GB", mem.free_mb as f64 / 1024.0),
+            format!(
+                "Available: {:.1}GB",
+                (mem.total_mb - mem.used_mb) as f64 / 1024.0
+            ),
         ];
 
         let details_paragraph = Paragraph::new(lines.join(
@@ -210,7 +208,16 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         ))
         .style(Style::default())
         .alignment(Alignment::Left);
-        frame.render_widget(details_paragraph, mem_sections[2]);
+        frame.render_widget(details_paragraph, mem_sections[1]);
+
+        // Memory Timeline Chart at the bottom
+        let mem_timeline_chart = TimelineChart::new("Memory Usage", host_id)
+            .data(mem_timeline.timeline_data.clone())
+            .y_bounds((0.0, 100.0))
+            .y_unit("%")
+            .color(Color::Green);
+
+        mem_timeline_chart.render(frame, mem_sections[2]);
     } else {
         let paragraph = Paragraph::new("No Mem data")
             .block(Block::default())
