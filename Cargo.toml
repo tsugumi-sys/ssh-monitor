@@ -1,6 +1,6 @@
 [package]
 name = "ssh-monitor"
-version = "0.1.1"
+version = "0.1.2"
 description = "An ssh monitoring tool."
 authors = ["Akira Noda <61897166+tsugumi-sys@users.noreply.github.com>"]
 license = "MIT"
