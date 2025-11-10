@@ -60,7 +60,7 @@ jobs:
           tar czf ssh-monitor-${{ matrix.target }}.tar.gz ssh-monitor
 
       - name: Upload release asset
-        uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8
+        uses: softprops/action-gh-release@5be0e66d93ac7ed76da52eca8bb058f665c3a5fe
         with:
           files: target/${{ matrix.target }}/release/ssh-monitor-${{ matrix.target }}.tar.gz
         env:
